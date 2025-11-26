@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --surface: #f8fafc;
+  --text-main: #0f172a;
+  --primary: #2563eb;
+}
+
+.dark {
+  --background: #020617;
+  --surface: #0f172a;
+  --text-main: #f8fafc;
+  --primary: #3b82f6;
+}
+
+body {
+  @apply bg-background text-text-main transition-colors duration-200;
+}

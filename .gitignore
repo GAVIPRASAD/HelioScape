@@ -1,0 +1,23 @@
+# Docker
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Gemini artifacts (optional - remove if you want to commit them)
+.gemini/
+
+Todo.md
