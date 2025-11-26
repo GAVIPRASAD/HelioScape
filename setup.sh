@@ -59,6 +59,7 @@ PROJECT_NAME=${PROJECT_NAME}
 # Ports
 SERVER_PORT=5000
 CLIENT_PORT=5173
+VITE_API_URL=http://localhost:5000
 
 # Database Secrets (Auto-Generated)
 MONGO_USER=admin
@@ -84,9 +85,8 @@ echo -e "${GREEN}✅ Environment clean.${NC}"
 echo -e "\n${BLUE}[4/4] Building and Starting Application...${NC}"
 echo "   - This might take a minute on the first run..."
 
-# Run Docker Compose
-# --build: forces rebuild of images
-# -d: runs in detached mode (background)
+# 1. Build and start in background first to ensure containers exist
+echo -e "   🔨 Building containers..."
 docker-compose --env-file $ENV_FILE up -d --build
 
 if [ $? -eq 0 ]; then
@@ -98,6 +98,11 @@ if [ $? -eq 0 ]; then
     echo -e "   🗄️  MongoDB:  ${GREEN}localhost:27017${NC}"
     echo -e "\n   📝 To view logs:  ${BLUE}docker-compose logs -f${NC}"
     echo -e "   🛑 To stop:       ${BLUE}docker-compose down${NC}"
+    echo -e "\n${BLUE}👀 Entering Watch Mode...${NC}"
+    echo -e "   (Press Ctrl+C to stop watching, containers will keep running)"
+    
+    # 2. Start Watch Mode
+    docker-compose watch
 else
     echo -e "\n${RED}❌ Error: Docker Compose failed to start.${NC}"
 fi

@@ -22,6 +22,7 @@ version: '3.8'
 services:
   mongo:
     image: mongo:latest
+    container_name: helio_db
     ports:
       - "27017:27017"
     environment:
@@ -29,46 +30,78 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: \${MONGO_PASS}
     volumes:
       - mongo_data:/data/db
+      - mongo_config:/data/configdb
     networks:
       - helio_net
 
   server:
     build: ./server
+    container_name: helio_server
     ports:
       - "\${SERVER_PORT}:5000"
     environment:
-      - MONGO_URI=mongodb://\${MONGO_USER}:\${MONGO_PASS}@mongo:27017/admin
+      - MONGO_URI=mongodb://\${MONGO_USER}:\${MONGO_PASS}@helio_db:27017/admin
       - JWT_SECRET=\${JWT_SECRET}
-    volumes:
-      - ./server:/app
-      # Named Volume for dependencies
-      - server_modules:/app/node_modules
+    # volumes:
+      #   # - ./server:/app # Disabled for watch mode
+      #   # - server_modules:/app/node_modules # Not needed without bind mount
     depends_on:
       - mongo
     networks:
       - helio_net
+    # --- WATCH MODE CONFIGURATION ---
+    # This 'develop' section enables 'docker compose watch'.
+    # It replaces legacy bind mounts for better performance and automatic rebuilding.
+    develop:
+      watch:
+        # SYNC: Hot-reload code changes instantly
+        - action: sync
+          path: ./server
+          target: /app
+          ignore:
+            - node_modules/
+        # REBUILD: Rebuild container when dependencies change
+        - action: rebuild
+          path: ./server/package.json
 
   client:
     build: ./client
+    container_name: helio_client
     ports:
       - "\${CLIENT_PORT}:5173"
     environment:
-      - VITE_API_URL=http://localhost:5000
-    volumes:
-      - ./client:/app
-      # Named Volume for dependencies
-      - client_modules:/app/node_modules
+      - VITE_API_URL=\${VITE_API_URL}
+    # volumes:
+      # NOTE: Bind mounts are DISABLED for 'watch' mode to improve performance on macOS/Windows.
+      # File syncing is handled by the 'develop' section below.
+      # - ./client:/app 
+      # - client_modules:/app/node_modules 
     networks:
       - helio_net
+    
+    # --- WATCH MODE CONFIGURATION ---
+    develop:
+      watch:
+        # SYNC: Hot-reload code changes instantly
+        - action: sync
+          path: ./client
+          target: /app
+          ignore:
+            - node_modules/
+        # REBUILD: Rebuild container when dependencies change
+        - action: rebuild
+          path: ./client/package.json
 
 # Define explicit names for all persistent data
 volumes:
   mongo_data:
     name: \${PROJECT_NAME}_mongo_data
-  server_modules:
-    name: \${PROJECT_NAME}_server_node_modules
-  client_modules:
-    name: \${PROJECT_NAME}_client_node_modules
+  mongo_config:
+    name: \${PROJECT_NAME}_mongo_config
+  # server_modules:
+  #   name: \${PROJECT_NAME}_server_node_modules
+  # client_modules:
+  #   name: \${PROJECT_NAME}_client_node_modules
 
 networks:
   helio_net:

@@ -1,0 +1,19 @@
+module.exports = {
+  API_PREFIX: "/api",
+  AUTH_PREFIX: "/auth",
+
+  PROVIDERS: {
+    GOOGLE: "GOOGLE",
+    DROPBOX: "DROPBOX",
+    ONEDRIVE: "ONEDRIVE",
+  },
+
+  FILE_STATUS: {
+    PENDING: "PENDING",
+    UPLOADING: "UPLOADING",
+    UPLOADED: "UPLOADED",
+    FAILED: "FAILED",
+  },
+
+  CHUNK_SIZE: 10 * 1024 * 1024, // 10MB
+};
