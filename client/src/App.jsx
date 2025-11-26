@@ -1,31 +1,46 @@
-import React from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Settings from "./pages/Settings";
+import OAuthCallback from "./pages/OAuthCallback";
+import { Toaster } from "@/components/ui/toaster";
+import { useThemeStore } from "@/store/useThemeStore";
 import Layout from "@/components/layout/Layout";
+import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import Dashboard from "@/pages/Dashboard";
-import { ROUTES } from "@/constants";
+import LandingPage from "@/pages/LandingPage";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 
 function App() {
+  // Initialize theme
+  const { theme } = useThemeStore();
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
+
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to={ROUTES.DASHBOARD} replace />} />
-          <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
-          <Route
-            path={ROUTES.SETTINGS}
-            element={<div>Settings Page </div>}
-          />
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/oauth/callback" element={<OAuthCallback />} />
+
+        {/* Protected/Layout Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
         </Route>
-        <Route
-          path={ROUTES.LOGIN}
-          element={<div>Login Page (Coming Soon)</div>}
-        />
       </Routes>
+      <Toaster />
     </Router>
   );
 }

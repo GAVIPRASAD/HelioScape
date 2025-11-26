@@ -5,21 +5,40 @@ const config = require("../config");
 
 const signToken = (id) => {
   return jwt.sign({ id }, config.JWT_SECRET, {
-    expiresIn: "90d",
+    expiresIn: "10d",
   });
+};
+
+const sanitizeUser = (user) => {
+  const userObj = user.toObject ? user.toObject() : user;
+
+  // Remove password if present
+  delete userObj.password;
+  delete userObj.__v;
+  // Keeping timestamps and status fields as requested
+
+  // Sanitize linked accounts
+  if (userObj.linkedAccounts) {
+    userObj.linkedAccounts = userObj.linkedAccounts.map((account) => ({
+      provider: account.provider,
+      email: account.email,
+      storageQuota: account.storageQuota,
+      // Exclude tokens, expiry, providerId
+    }));
+  }
+
+  return userObj;
 };
 
 const createSendToken = (user, statusCode, res) => {
   const token = signToken(user._id);
-
-  // Remove password from output
-  user.password = undefined;
+  const sanitizedUser = sanitizeUser(user);
 
   res.status(statusCode).json({
     status: "success",
     token,
     data: {
-      user,
+      user: sanitizedUser,
     },
   });
 };
@@ -53,11 +72,44 @@ exports.login = async (req, res, next) => {
       return next(new AppError("Incorrect email or password", 401));
     }
 
-    // 3) If everything ok, send token to client
+    // 3) Update lastLogin and isLoggedIn
+    user.lastLogin = Date.now();
+    user.isLoggedIn = true;
+    await user.save({ validateBeforeSave: false });
+
+    // 4) If everything ok, send token to client
     createSendToken(user, 200, res);
   } catch (err) {
     next(err);
   }
+};
+
+exports.logout = async (req, res, next) => {
+  try {
+    // If we had a cookie-based auth, we would clear it here.
+    // For JWT stateless, we can't "invalidate" the token easily without a blacklist.
+    // But we can update the user status.
+
+    // We need the user from the protect middleware to be attached to req
+    if (req.user) {
+      req.user.isLoggedIn = false;
+      await req.user.save({ validateBeforeSave: false });
+    }
+
+    res.status(200).json({ status: "success" });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getMe = (req, res, next) => {
+  const sanitizedUser = sanitizeUser(req.user);
+  res.status(200).json({
+    status: "success",
+    data: {
+      user: sanitizedUser,
+    },
+  });
 };
 
 exports.protect = async (req, res, next) => {

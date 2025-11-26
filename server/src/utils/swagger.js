@@ -18,6 +18,10 @@ const options = {
         url: `http://localhost:${config.PORT}`,
         description: "Development Server",
       },
+      {
+        url: `${config.PROD_SERVER_URL}`,
+        description: "PROD Server",
+      },
     ],
     components: {
       securitySchemes: {

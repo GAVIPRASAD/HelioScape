@@ -5,7 +5,7 @@ import { THEME } from "../constants";
 export const useThemeStore = create(
   persist(
     (set) => ({
-      theme: THEME.LIGHT,
+      theme: THEME.DARK,
       toggleTheme: () =>
         set((state) => {
           const newTheme =
@@ -27,7 +27,7 @@ export const useThemeStore = create(
       },
     }),
     {
-      name: "theme-storage",
+      name: "theme-storage-v2",
     }
   )
 );

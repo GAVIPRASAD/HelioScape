@@ -41,7 +41,10 @@ export const useAuthStore = create(
       token: null,
       isAuthenticated: false,
       login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        set({ user: null, token: null, isAuthenticated: false });
+        // Optional: Call backend logout if needed
+      },
     }),
     {
       name: "auth-storage",

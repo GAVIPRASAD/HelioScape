@@ -7,6 +7,8 @@ const config = require("./config");
 const errorHandler = require("./utils/errorHandler");
 const AppError = require("./utils/AppError");
 const authRoutes = require("./routes/authRoutes");
+const oauthRoutes = require("./routes/oauthRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpecs = require("./utils/swagger");
 
@@ -26,6 +28,8 @@ mongoose
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/oauth", oauthRoutes);
+app.use("/api/files", uploadRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 app.get("/", (req, res) => {
