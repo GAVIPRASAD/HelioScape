@@ -40,7 +40,7 @@ services:
     ports:
       - "\${SERVER_PORT}:5000"
     environment:
-      - MONGO_URI=mongodb://\${MONGO_USER}:\${MONGO_PASS}@helio_db:27017/admin
+      - MONGO_URI=mongodb://\${MONGO_USER}:\${MONGO_PASS}@mongo:27017/admin
       - JWT_SECRET=\${JWT_SECRET}
     # volumes:
       #   # - ./server:/app # Disabled for watch mode

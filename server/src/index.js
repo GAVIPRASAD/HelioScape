@@ -7,6 +7,8 @@ const config = require("./config");
 const errorHandler = require("./utils/errorHandler");
 const AppError = require("./utils/AppError");
 const authRoutes = require("./routes/authRoutes");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpecs = require("./utils/swagger");
 
 const app = express();
 
@@ -24,6 +26,7 @@ mongoose
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 app.get("/", (req, res) => {
   res.json({ message: "HelioScape API is running....!!", status: "OK" });
