@@ -31,9 +31,9 @@ class DistributorStream extends Writable {
       mimeType: "application/octet-stream",
     };
 
-    console.log(
-      `[Distributor] Uploading chunk ${index} (${data.length} bytes) to ${provider.name}...`
-    );
+    // console.log(
+    //   `[Distributor] Uploading chunk ${index} (${data.length} bytes) to ${provider.name}...`
+    // );
 
     provider
       .upload(chunkStream, chunkMetadata)
@@ -41,11 +41,11 @@ class DistributorStream extends Writable {
         this.uploadedChunks.push({
           index,
           provider: provider.name,
-          providerFileId: result.id,
+          providerFileId: result.fileId,
           size: result.size,
           // Add hash/checksum here later for integrity
         });
-        console.log(`[Distributor] Chunk ${index} uploaded successfully.`);
+        // console.log(`[Distributor] Chunk ${index} uploaded successfully.`);
         callback();
       })
       .catch((err) => {

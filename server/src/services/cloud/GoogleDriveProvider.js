@@ -10,6 +10,13 @@ class GoogleDriveProvider extends CloudProvider {
       config.GOOGLE.CLIENT_SECRET,
       config.GOOGLE.CALLBACK_URL
     );
+
+    // Listen for token updates (refresh)
+    this.oauth2Client.on("tokens", (tokens) => {
+      if (this.refreshCallback) {
+        this.refreshCallback(tokens);
+      }
+    });
   }
 
   /**
@@ -17,7 +24,7 @@ class GoogleDriveProvider extends CloudProvider {
    */
   async authenticate() {
     const scopes = [
-      "https://www.googleapis.com/auth/drive.file", // Access only files created by the app
+      "https://www.googleapis.com/auth/drive.appdata", // Access only hidden app data folder
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
     ];
@@ -69,17 +76,24 @@ class GoogleDriveProvider extends CloudProvider {
   }
 
   /**
+   * Register a callback for token refresh events.
+   * @param {Function} callback - Function to handle new tokens (tokens) => void
+   */
+  onTokenRefresh(callback) {
+    this.refreshCallback = callback;
+  }
+
+  /**
    * Helper to set credentials from stored token data.
    */
   setCredentials(tokenData) {
     this.oauth2Client.setCredentials({
       access_token: tokenData.accessToken,
       refresh_token: tokenData.refreshToken,
-      // expiry_date: tokenData.expiryDate.getTime(), // Optional
+      expiry_date: new Date(tokenData.expiryDate).getTime(),
     });
   }
 
-  // Stubs for other methods
   /**
    * Validate the token by making a lightweight API call.
    */
@@ -99,16 +113,11 @@ class GoogleDriveProvider extends CloudProvider {
    * Upload a file stream to Google Drive.
    */
   async upload(fileStream, metadata) {
-    // Ensure credentials are set before calling this (done by caller or we pass tokenData)
-    // For now, assuming setCredentials was called or we need to change signature to accept tokenData
-    // But CloudProvider.upload signature is (fileStream, metadata).
-    // So the caller must have called setCredentials on the provider instance first.
-
     const drive = google.drive({ version: "v3", auth: this.oauth2Client });
 
     const fileMetadata = {
       name: metadata.name,
-      // parents: ['appDataFolder'] // Optional: Store in hidden app folder
+      parents: ["appDataFolder"], // Store in hidden app folder
     };
 
     const media = {
@@ -132,14 +141,22 @@ class GoogleDriveProvider extends CloudProvider {
    * Download a file as a stream.
    */
   async download(fileId) {
-    const drive = google.drive({ version: "v3", auth: this.oauth2Client });
+    try {
+      const drive = google.drive({ version: "v3", auth: this.oauth2Client });
 
-    const res = await drive.files.get(
-      { fileId: fileId, alt: "media" },
-      { responseType: "stream" }
-    );
+      const res = await drive.files.get(
+        { fileId: fileId, alt: "media" },
+        { responseType: "stream" }
+      );
 
-    return res.data;
+      return res.data;
+    } catch (error) {
+      // console.error(
+      //   "[GoogleDrive] Download Error:",
+      //   error.response ? error.response.data : error.message
+      // );
+      throw error;
+    }
   }
 
   /**

@@ -22,11 +22,15 @@ exports.initiateAuth = async (req, res, next) => {
     const { provider } = req.params;
     const cloudProvider = getProvider(provider);
 
-    // Generate auth URL
-    // Pass user ID as state to identify user in callback if needed,
-    // though usually we handle this via session/cookie or client-side flow.
-    // For this architecture, we might need to be careful about state.
     const authUrl = await cloudProvider.authenticate();
+
+    // Set a short-lived cookie to track the user across the redirect
+    res.cookie("pending_user", req.user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax", // Required for OAuth redirects
+      maxAge: 10 * 60 * 1000, // 10 minutes
+    });
 
     res.status(200).json({
       status: "success",
@@ -40,7 +44,14 @@ exports.initiateAuth = async (req, res, next) => {
 exports.handleCallback = async (req, res, next) => {
   try {
     const { provider } = req.params;
-    const { code, state } = req.query; // 'state' could be used for security/user tracking
+    const { code } = req.query;
+    const userId = req.cookies.pending_user;
+
+    if (!userId) {
+      return next(
+        new AppError("Authentication session expired. Please try again.", 401)
+      );
+    }
 
     if (!code) {
       return next(new AppError("Authorization code is missing.", 400));
@@ -49,31 +60,48 @@ exports.handleCallback = async (req, res, next) => {
     const cloudProvider = getProvider(provider);
     const tokenData = await cloudProvider.exchangeCode(code);
 
-    // TODO: We need to know WHICH user this is for.
-    // Since the callback comes from the provider to the backend directly (usually),
-    // we lose the Auth header.
-    // Strategies:
-    // 1. Pass JWT in 'state' param during initiateAuth.
-    // 2. Client handles the callback code and sends it to a POST endpoint (Preferred for SPA).
+    // Link Account Logic (Duplicated from linkAccount, could be refactored)
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new AppError("User not found.", 404));
+    }
 
-    // For now, let's assume Strategy 2: Client receives code -> POST /api/oauth/:provider/link
-    // But this route is GET /callback.
-    // If we stick to server-side callback, we MUST use the 'state' param to pass the userId (encrypted/signed).
+    const existingIndex = user.linkedAccounts.findIndex(
+      (acc) => acc.provider === provider
+    );
 
-    // Let's pivot to Strategy 2 for better SPA integration:
-    // The 'callback' endpoint here might just redirect back to the client with the code?
-    // Or we change the architecture to have the Client handle the redirect, grab the code, and call the API.
+    const newAccount = {
+      provider,
+      providerId: tokenData.providerId || "unknown",
+      email: tokenData.email,
+      accessToken: tokenData.accessToken,
+      refreshToken: tokenData.refreshToken,
+      expiryDate: tokenData.expiryDate,
+    };
 
-    // Let's implement a simple success response for now, assuming the User will hit a different endpoint to actually link.
-    // WAIT: The plan says "Token Exchange".
+    if (existingIndex > -1) {
+      user.linkedAccounts[existingIndex] = newAccount;
+    } else {
+      user.linkedAccounts.push(newAccount);
+    }
 
-    res.status(200).json({
-      status: "success",
-      message: "Callback received. Please implement client-side code handling.",
-      code,
-    });
+    await user.save();
+
+    // Clear cookie
+    res.clearCookie("pending_user");
+
+    // Redirect back to frontend
+    res.redirect(
+      `${config.CLIENT_URL}/settings?status=success&provider=${provider}`
+    );
   } catch (err) {
-    next(err);
+    // If error, redirect to frontend with error param
+    console.error("OAuth Callback Error:", err);
+    res.redirect(
+      `${config.CLIENT_URL}/settings?status=error&message=${encodeURIComponent(
+        err.message
+      )}`
+    );
   }
 };
 

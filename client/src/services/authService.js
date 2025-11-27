@@ -28,10 +28,10 @@ export const registerUser = async (email, password) => {
 };
 
 export const initiateOAuth = async (provider) => {
-  const response = await axios.get(
-    `${API_URL}/oauth/${provider}`,
-    getAuthHeader()
-  );
+  const response = await axios.get(`${API_URL}/oauth/${provider}`, {
+    ...getAuthHeader(),
+    withCredentials: true,
+  });
   return response.data.data.url;
 };
 

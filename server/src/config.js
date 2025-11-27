@@ -10,9 +10,8 @@ module.exports = {
   GOOGLE: {
     CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    CALLBACK_URL: `${
-      process.env.CLIENT_URL || "http://localhost:5173"
-    }/oauth/callback`,
+    CALLBACK_URL:
+      process.env.GOOGLE_CALLBACK_URL ,
   },
 
   DROPBOX: {

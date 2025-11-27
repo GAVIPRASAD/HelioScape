@@ -1,7 +1,13 @@
 import React from "react";
 import { Menu, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { useThemeStore } from "@/store/useThemeStore";
 import { THEME } from "@/constants";
 import Sidebar from "./Sidebar";
@@ -19,6 +25,11 @@ const Navbar = () => {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs p-0">
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <SheetDescription className="sr-only">
+            Main navigation menu for accessing different sections of the
+            application.
+          </SheetDescription>
           <Sidebar className="border-r-0" />
         </SheetContent>
       </Sheet>

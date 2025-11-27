@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useUserQuery } from "@/hooks/useUserQuery";
+import { useFilesQuery } from "@/hooks/useFilesQuery";
 import UploadZone from "@/components/dashboard/UploadZone";
 import ProviderCard from "@/components/dashboard/ProviderCard";
 import { Button } from "@/components/ui/button";
@@ -12,36 +13,65 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, HardDrive, Activity, ShieldCheck } from "lucide-react";
+import {
+  Upload,
+  HardDrive,
+  Activity,
+  ShieldCheck,
+  Download,
+} from "lucide-react";
 import Loading from "@/components/ui/Loading";
+import { useToast } from "@/components/ui/use-toast";
+import axios from "axios";
+import { useAuthStore } from "@/store/useAuthStore";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const Dashboard = () => {
-  const { data: user, isLoading } = useUserQuery();
+  const { data: user, isLoading: isUserLoading } = useUserQuery();
+  const { data: files, isLoading: isFilesLoading } = useFilesQuery();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const { toast } = useToast();
 
-  if (isLoading) return <Loading text="Initializing Command Center..." />;
+  const handleDownload = async (fileId, fileName) => {
+    try {
+      const token = useAuthStore.getState().token;
+      toast({
+        title: "Initiating Download",
+        description: "Decrypting and reassembling file...",
+      });
 
-  // Mock Data for "Recent Transmissions" until Phase 5
-  const recentActivity = [
-    {
-      name: "Project_Alpha_Specs.pdf",
-      size: "2.4 MB",
-      status: "Encrypted",
-      time: "2 mins ago",
-    },
-    {
-      name: "Backup_2023.zip",
-      size: "1.2 GB",
-      status: "Distributed",
-      time: "1 hour ago",
-    },
-    {
-      name: "Client_Assets.png",
-      size: "4.8 MB",
-      status: "Sharded",
-      time: "3 hours ago",
-    },
-  ];
+      const response = await axios.get(`${API_URL}/files/${fileId}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob", // Important for binary data
+      });
+
+      // Create a blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", fileName); // or any other extension
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Complete",
+        description: "File decrypted successfully.",
+      });
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "Could not retrieve file.",
+      });
+    }
+  };
+
+  if (isUserLoading || isFilesLoading)
+    return <Loading text="Initializing Command Center..." />;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -92,16 +122,21 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-2">
-              <span className="text-5xl font-bold tracking-tighter">45.2</span>
+              <span className="text-5xl font-bold tracking-tighter">
+                {(
+                  (files?.reduce((acc, f) => acc + f.size, 0) || 0) /
+                  (1024 * 1024 * 1024)
+                ).toFixed(2)}
+              </span>
               <span className="text-xl text-muted-foreground mb-1">
                 GB Used
               </span>
             </div>
             <div className="h-2 w-full bg-secondary mt-4 rounded-full overflow-hidden">
-              <div className="h-full bg-primary w-[45%] animate-pulse" />
+              <div className="h-full bg-primary w-[10%] animate-pulse" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              45% of total encrypted capacity utilized.
+              Encrypted capacity utilized.
             </p>
           </CardContent>
         </Card>
@@ -131,27 +166,46 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((file, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-primary/10"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-primary/10 text-primary">
-                      <ShieldCheck className="h-4 w-4" />
+              {files?.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No files transmitted yet.
+                </p>
+              ) : (
+                files?.map((file) => (
+                  <div
+                    key={file._id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-primary/10"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="p-2 rounded-full bg-primary/10 text-primary shrink-0">
+                        <ShieldCheck className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate max-w-[200px]">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {(file.size / (1024 * 1024)).toFixed(2)} MB •{" "}
+                          {new Date(file.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {file.size} • {file.time}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <div className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs font-medium border border-green-500/20 hidden sm:block">
+                        Encrypted
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDownload(file._id, file.name)}
+                        className="hover:text-primary hover:bg-primary/10"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="px-2 py-1 rounded-full bg-green-500/10 text-green-500 text-xs font-medium border border-green-500/20">
-                    {file.status}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

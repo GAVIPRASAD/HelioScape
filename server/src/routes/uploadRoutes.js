@@ -7,6 +7,8 @@ const router = express.Router();
 // Protect all routes
 router.use(authController.protect);
 
+router.get("/", uploadController.listFiles);
 router.post("/", uploadController.uploadFile);
+router.get("/:id/download", uploadController.downloadFile);
 
 module.exports = router;

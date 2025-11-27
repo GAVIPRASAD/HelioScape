@@ -28,7 +28,7 @@ class LocalFileSystemProvider extends CloudProvider {
 
       writeStream.on("finish", () => {
         resolve({
-          id: filePath, // Using path as ID for simplicity
+          fileId: filePath, // Standardized key
           name: metadata.name,
           size: writeStream.bytesWritten,
           provider: this.name,

@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 const config = require("./config");
 const errorHandler = require("./utils/errorHandler");
 const AppError = require("./utils/AppError");
@@ -16,8 +17,9 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: config.CLIENT_URL })); // Restrict CORS to client URL
+app.use(cors({ origin: config.CLIENT_URL, credentials: true })); // Restrict CORS to client URL
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan("dev"));
 
 // Database Connection
