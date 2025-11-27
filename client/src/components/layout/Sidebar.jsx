@@ -54,7 +54,7 @@ const Sidebar = ({ className, onItemClick }) => {
           <NavLink
             key={item.href}
             to={item.href}
-            onClick={onItemClick}
+            onClick={() => onItemClick && onItemClick()}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 group relative overflow-hidden",
@@ -93,7 +93,10 @@ const Sidebar = ({ className, onItemClick }) => {
       {/* Footer / Logout */}
       <div className="p-4 border-t border-slate-200 dark:border-white/5">
         <button
-          onClick={logout}
+          onClick={() => {
+            logout();
+            if (onItemClick) onItemClick();
+          }}
           className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-white hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-100 dark:hover:border-red-500/20 border border-transparent transition-all duration-300 group"
         >
           <LogOut className="h-5 w-5 group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors" />

@@ -103,3 +103,242 @@ The application is configured via the `.env` file.
 - **Client**: Deploy as a Static Site. Build command: `npm run build`. Publish directory: `dist`.
 - **Server**: Deploy as a Web Service. Build command: `npm install`. Start command: `npm start`.
 - **Env Vars**: Ensure all `.env` variables are set in the deployment dashboard.
+
+HelioScape Cloud Credentials Setup Guide
+
+Version: 1.0.0
+Purpose: Step-by-step instructions to obtain API keys for all supported cloud storage providers.
+
+1. Google Drive API (OAuth 2.0)
+
+Google requires strict configuration for Redirect URIs. You will need separate credentials (or updated URIs) for Development and Production.
+
+Phase 1: Create Project & Enable API
+
+Go to the Google Cloud Console.
+
+Click Select a Project (top left) -> New Project. Name it HelioScape.
+
+Open the Navigation Menu (☰) -> APIs & Services -> Library.
+
+Search for Google Drive API and click Enable.
+
+Phase 2: Configure Consent Screen
+
+Go to APIs & Services -> OAuth consent screen.
+
+User Type: Select External. Click Create.
+
+App Info:
+
+App Name: HelioScape
+
+User Support Email: Your email.
+
+Developer Contact: Your email.
+
+Scopes: Add .../auth/drive.appdata, .../auth/userinfo.email, .../auth/userinfo.profile.
+
+Test Users: (Critical for Testing Mode)
+
+Click + ADD USERS.
+
+Enter your personal Gmail address (e.g., your.email@gmail.com).
+
+Note: In Production, you must click "Publish App" to remove this restriction (requires verification for wide release).
+
+Phase 3: Create Credentials
+
+Go to APIs & Services -> Credentials.
+
+Click + CREATE CREDENTIALS -> OAuth client ID.
+
+Application Type: Web application.
+
+Name: HelioScape Client.
+
+For Development (Localhost)
+
+Authorized JavaScript Origins:
+
+http://localhost:5173
+
+http://localhost:5000
+
+Authorized Redirect URIs:
+
+http://localhost:5000/api/oauth/google/callback
+
+For Production (Live Domain)
+
+Authorized JavaScript Origins:
+
+https://yourdomain.com
+
+https://api.yourdomain.com
+
+Authorized Redirect URIs:
+
+https://api.yourdomain.com/api/oauth/google/callback
+
+Click Create.
+
+Copy: Client ID and Client Secret to your .env.
+
+2. Dropbox API (OAuth 2.0)
+
+Dropbox allows you to use the same App for both dev and prod, but it's cleaner to create two.
+
+Steps
+
+Go to the Dropbox App Console.
+
+Click Create app.
+
+Choose an API: Scoped access.
+
+Choose the type of access: App folder (Recommended for privacy) or Full Dropbox.
+
+Name your app: HelioScape-[Dev/Prod]-[YourName].
+
+Click Create app.
+
+Configuration (Settings Tab)
+
+Redirect URIs: Add the following:
+
+Dev: http://localhost:5000/api/oauth/dropbox/callback
+
+Prod: https://api.yourdomain.com/api/oauth/dropbox/callback
+
+App Key: This is your DROPBOX_CLIENT_ID.
+
+App Secret: This is your DROPBOX_CLIENT_SECRET.
+
+Permissions (Permissions Tab)
+
+Check: files.content.write (Uploads).
+
+Check: files.content.read (Downloads).
+
+Click Submit at the bottom.
+
+3. OneDrive / Microsoft Graph (OAuth 2.0)
+
+This is done via the Azure Portal.
+
+Steps
+
+Go to Azure Portal > App Registrations.
+
+Click + New Registration.
+
+Name: HelioScape.
+
+Supported Account Types: "Accounts in any organizational directory (Any Azure AD directory - Multitenant) and personal Microsoft accounts (e.g. Skype, Xbox)". (Critical for personal users).
+
+Redirect URI (Web):
+
+Dev: http://localhost:5000/api/oauth/onedrive/callback
+
+Prod: https://api.yourdomain.com/api/oauth/onedrive/callback
+
+Click Register.
+
+Getting Keys
+
+Application (client) ID: Copy this from the Overview page.
+
+Client Secret:
+
+Go to Certificates & secrets (Left Sidebar).
+
+Click + New client secret.
+
+Add a description and expiry.
+
+Copy the "Value" immediately (It will be hidden later).
+
+4. MEGA (Direct Credentials)
+
+MEGA uses Zero-Knowledge Encryption derived from your password. It does not use OAuth.
+
+Steps
+
+Go to MEGA Registration.
+
+Create a New Free Account specifically for this app (e.g., helioscape.bot@gmail.com).
+
+Important: Do NOT enable 2FA on this account. The API library cannot handle 2FA easily.
+
+Usage: Use the Email and Password directly in your .env file.
+
+5. S3 Compatible Providers (Oracle, Backblaze, Cloudflare)
+
+These use the standard S3 Access Key/Secret Key pair.
+
+A. Cloudflare R2 (10GB Free)
+
+Cloudflare Dash -> R2.
+
+Manage R2 API Tokens -> Create API Token.
+
+Permissions: Admin Read & Write.
+
+Copy: Access Key ID, Secret Access Key, and Endpoint URL (e.g., https://<accountid>.r2.cloudflarestorage.com).
+
+B. Backblaze B2 (10GB Free)
+
+Backblaze Console -> App Keys.
+
+Add a New Application Key.
+
+Access: All Buckets.
+
+Copy: keyID (Access Key) and applicationKey (Secret Key).
+
+Endpoint: Go to "Buckets" to find your S3 Endpoint (e.g., s3.us-west-002.backblazeb2.com).
+
+C. Oracle Cloud (10GB Free)
+
+Oracle Console -> Profile -> My Profile.
+
+Customer Secret Keys (Left/Bottom Menu).
+
+Generate Key.
+
+Copy: "Generated Key" (Secret) and "Access Key".
+
+Endpoint: https://<namespace>.compat.objectstorage.<region>.oraclecloud.com.
+
+6. Summary .env Template
+
+# --- GOOGLE ---
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+# DEV: http://localhost:5000/api/oauth/google/callback
+# PROD: [https://api.yourdomain.com/api/oauth/google/callback](https://api.yourdomain.com/api/oauth/google/callback)
+GOOGLE_CALLBACK_URL=
+
+# --- DROPBOX ---
+DROPBOX_CLIENT_ID=
+DROPBOX_CLIENT_SECRET=
+# DEV: http://localhost:5000/api/oauth/dropbox/callback
+# PROD: [https://api.yourdomain.com/api/oauth/dropbox/callback](https://api.yourdomain.com/api/oauth/dropbox/callback)
+DROPBOX_CALLBACK_URL=
+
+# --- ONEDRIVE ---
+ONEDRIVE_CLIENT_ID=
+ONEDRIVE_CLIENT_SECRET=
+# DEV: http://localhost:5000/api/oauth/onedrive/callback
+# PROD: [https://api.yourdomain.com/api/oauth/onedrive/callback](https://api.yourdomain.com/api/oauth/onedrive/callback)
+ONEDRIVE_CALLBACK_URL=
+
+# --- MEGA ---
+MEGA_EMAIL=
+MEGA_PASSWORD=
+
+# --- GENERIC S3 (Oracle/Backblaze/R2) ---
+S3_ACCESS_KEY=
+S3_SECRET_KEY=
+S3_ENDPOINT=

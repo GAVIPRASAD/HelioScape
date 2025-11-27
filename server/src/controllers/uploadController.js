@@ -435,3 +435,38 @@ exports.moveFile = async (req, res, next) => {
     next(err);
   }
 };
+/**
+ * Searches for files and folders by name.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
+exports.searchFiles = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(200).json({
+        status: "success",
+        data: { files: [], folders: [] },
+      });
+    }
+
+    const regex = new RegExp(q, "i"); // Case-insensitive search
+
+    // Parallel search
+    const [files, folders] = await Promise.all([
+      File.find({ user: req.user._id, name: regex }).sort({ createdAt: -1 }),
+      require("../models/Folder")
+        .find({ user: req.user._id, name: regex })
+        .sort({ createdAt: -1 }),
+    ]);
+
+    res.status(200).json({
+      status: "success",
+      results: files.length + folders.length,
+      data: { files, folders },
+    });
+  } catch (err) {
+    next(err);
+  }
+};

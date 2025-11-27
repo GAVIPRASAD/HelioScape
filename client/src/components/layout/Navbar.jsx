@@ -1,6 +1,7 @@
 import React from "react";
-import { Menu, Moon, Sun, Cloud, User } from "lucide-react";
+import { Menu, Moon, Sun, Cloud, User, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -10,17 +11,27 @@ import {
 } from "@/components/ui/sheet";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useSearchStore } from "@/store/useSearchStore";
 import { THEME } from "@/constants";
 import Sidebar from "./Sidebar";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 const Navbar = () => {
   const { theme, toggleTheme } = useThemeStore();
   const { user } = useAuthStore();
   const [isOpen, setIsOpen] = React.useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const searchTerm = useSearchStore((state) => state.searchTerm);
+
+  React.useEffect(() => {
+    if (searchTerm && location.pathname !== "/files") {
+      navigate("/files");
+    }
+  }, [searchTerm, location.pathname, navigate]);
 
   return (
-    <header className="sticky top-4 z-40 mx-auto w-[95%] max-w-7xl rounded-full glass-panel px-6 h-16 flex items-center justify-between transition-all duration-300 hover:border-cyan-500/20 hover:shadow-lg dark:hover:shadow-cyan-500/10 bg-white/80 dark:bg-black/40 border-white/40 dark:border-white/5">
+    <header className="mx-auto w-[95%] max-w-7xl rounded-full glass-panel px-6 h-16 flex items-center justify-between transition-all duration-300 hover:border-cyan-500/20 hover:shadow-lg dark:hover:shadow-cyan-500/10 bg-white/80 dark:bg-black/40 border-white/40 dark:border-white/5 mt-4 flex-none">
       {/* Mobile Menu */}
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
@@ -43,16 +54,36 @@ const Navbar = () => {
         </SheetContent>
       </Sheet>
 
-      {/* Logo Area */}
-      <Link to="/" className="flex items-center gap-3 group">
-        <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-violet-500 shadow-lg group-hover:scale-110 transition-transform duration-300">
-          <Cloud className="h-5 w-5 text-white" />
-          <div className="absolute inset-0 rounded-full bg-white/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+      {/* Logo Area or Search Bar */}
+      {user ? (
+        <div className="flex-1 max-w-xl mx-4">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-slate-400 group-focus-within:text-cyan-500 transition-colors" />
+            </div>
+            <Input
+              type="text"
+              placeholder="Search files, folders..."
+              className="pl-10 pr-4 h-10 w-full rounded-full bg-slate-100 dark:bg-white/5 border-transparent focus:bg-white dark:focus:bg-black focus:border-cyan-500/50 transition-all duration-300"
+              value={useSearchStore((state) => state.searchTerm)}
+              onChange={(e) =>
+                useSearchStore.getState().setSearchTerm(e.target.value)
+              }
+            />
+          </div>
         </div>
-        <span className="font-heading font-bold text-xl tracking-wide text-slate-900 dark:text-white">
-          Helio<span className="text-cyan-600 dark:text-cyan-400">Scape</span>
-        </span>
-      </Link>
+      ) : (
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-violet-500 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <Cloud className="h-5 w-5 text-white" />
+            <div className="absolute inset-0 rounded-full bg-white/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <span className="font-heading font-bold text-xl tracking-wide text-slate-900 dark:text-white">
+            Helio
+            <span className="text-cyan-600 dark:text-cyan-400">Scape</span>
+          </span>
+        </Link>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-4">

@@ -1,10 +1,125 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { User, Mail, Shield, Activity, HardDrive, Edit } from "lucide-react";
+import {
+  User,
+  Mail,
+  Shield,
+  Activity,
+  HardDrive,
+  Edit,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import axios from "axios";
+import { API_BASE_URL as API_URL } from "@/constants";
 
 const ProfilePage = () => {
-  const { user } = useAuthStore();
+  const { user, token, updateUser } = useAuthStore();
+  const { toast } = useToast();
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Form State
+  const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      if (name !== user.name || email !== user.email) {
+        const res = await axios.patch(
+          `${API_URL}/users/updateMe`,
+          { name, email },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        updateUser({
+          ...user,
+          name: res.data.data.user.name,
+          email: res.data.data.user.email,
+        });
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been updated successfully.",
+          variant: "default",
+        });
+      }
+      setIsEditOpen(false);
+    } catch (error) {
+      console.error("Update failed:", error);
+      toast({
+        title: "Update Failed",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Could not update profile.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      if (newPassword !== confirmPassword) {
+        throw new Error("New passwords do not match.");
+      }
+
+      await axios.patch(
+        `${API_URL}/users/updateMyPassword`,
+        {
+          passwordCurrent: currentPassword,
+          password: newPassword,
+          passwordConfirm: confirmPassword,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast({
+        title: "Password Updated",
+        description: "Your password has been changed securely.",
+        variant: "default",
+      });
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setIsChangePasswordOpen(false);
+    } catch (error) {
+      console.error("Password update failed:", error);
+      toast({
+        title: "Update Failed",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Could not update password.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -73,10 +188,140 @@ const ProfilePage = () => {
                 </div>
               </div>
 
-              <Button className="rounded-full bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-800 dark:hover:bg-white/90">
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Profile
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="rounded-full bg-slate-900 dark:bg-white text-white dark:text-black hover:bg-slate-800 dark:hover:bg-white/90">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Profile
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px] glass-panel border-white/20 dark:border-white/10">
+                    <DialogHeader>
+                      <DialogTitle>Edit Profile</DialogTitle>
+                      <DialogDescription>
+                        Update your public profile information.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form
+                      onSubmit={handleUpdateProfile}
+                      className="grid gap-4 py-4"
+                    >
+                      <div className="grid gap-2">
+                        <Label htmlFor="name">Name</Label>
+                        <Input
+                          id="name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="glass-button"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="glass-button"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className="bg-cyan-500 hover:bg-cyan-600 text-white"
+                        >
+                          {isLoading && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Save Changes
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog
+                  open={isChangePasswordOpen}
+                  onOpenChange={setIsChangePasswordOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5"
+                    >
+                      <Shield className="mr-2 h-4 w-4" />
+                      Change Password
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px] glass-panel border-white/20 dark:border-white/10">
+                    <DialogHeader>
+                      <DialogTitle>Change Password</DialogTitle>
+                      <DialogDescription>
+                        Ensure your account is secure with a strong password.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form
+                      onSubmit={handleChangePassword}
+                      className="grid gap-4 py-4"
+                    >
+                      <div className="grid gap-2">
+                        <Label htmlFor="currentPassword">
+                          Current Password
+                        </Label>
+                        <Input
+                          id="currentPassword"
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Required"
+                          className="glass-button"
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min 8 characters"
+                          className="glass-button"
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="confirmPassword">
+                          Confirm New Password
+                        </Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Re-enter new password"
+                          className="glass-button"
+                          required
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className="bg-violet-500 hover:bg-violet-600 text-white"
+                        >
+                          {isLoading && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Update Password
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </div>
         </div>

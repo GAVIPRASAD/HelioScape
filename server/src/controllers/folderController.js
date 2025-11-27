@@ -67,6 +67,26 @@ exports.getFolders = async (req, res, next) => {
   }
 };
 
+exports.getFolder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const folder = await Folder.findOne({ _id: id, user: req.user._id });
+
+    if (!folder) {
+      return next(new AppError("Folder not found", 404));
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        folder,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const FileService = require("../services/FileService");
 
 // ...

@@ -11,7 +11,10 @@ router
   .get(folderController.getFolders)
   .post(folderController.createFolder);
 
-router.route("/:id").delete(folderController.deleteFolder);
+router
+  .route("/:id")
+  .get(folderController.getFolder)
+  .delete(folderController.deleteFolder);
 /**
  * @swagger
  * /folders/{id}/rename:

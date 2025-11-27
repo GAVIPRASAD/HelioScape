@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(authController.protect);
 
 router.get("/", uploadController.listFiles);
+router.get("/search", uploadController.searchFiles);
 router.post("/", uploadController.uploadFile);
 router.get("/:id/download", uploadController.downloadFile);
 router.delete("/:id", uploadController.deleteFile);
