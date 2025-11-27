@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import Files from "@/pages/Files";
 
 function App() {
   // Initialize theme
@@ -36,6 +37,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/files" element={<Files />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

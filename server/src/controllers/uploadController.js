@@ -6,7 +6,18 @@ const ShardStream = require("../services/engine/ShardStream");
 const DistributorStream = require("../services/engine/DistributorStream");
 const LocalFileSystemProvider = require("../services/cloud/LocalFileSystemProvider");
 const GoogleDriveProvider = require("../services/cloud/GoogleDriveProvider");
+const DecipherStream = require("../services/engine/DecipherStream");
 
+/**
+ * Handles file uploads.
+ *
+ * Pipeline:
+ * 1. Busboy parses the incoming multipart request.
+ * 2. CipherStream encrypts the file stream.
+ * 3. ShardStream splits the encrypted stream into chunks.
+ * 4. DistributorStream uploads chunks to cloud providers.
+ * 5. Saves file metadata and chunk manifest to MongoDB.
+ */
 exports.uploadFile = (req, res, next) => {
   const busboy = Busboy({ headers: req.headers });
 
@@ -155,82 +166,184 @@ exports.listFiles = async (req, res, next) => {
   }
 };
 
-const DecipherStream = require("../services/engine/DecipherStream");
-
+/**
+ * Handles file downloads.
+ *
+ * Pipeline:
+ * 1. Retrieves file metadata from DB (including hidden encryption key).
+ * 2. Identifies the provider holding the file chunk.
+ * 3. Fetches the raw stream from the provider.
+ * 4. DecipherStream decrypts the stream using the stored key.
+ * 5. Pipes the decrypted content to the response.
+ */
 exports.downloadFile = async (req, res, next) => {
   try {
     const { id } = req.params;
+    console.log(`[Download] Request for file ID: ${id}`);
+
     const file = await File.findOne({ _id: id, user: req.user._id }).select(
       "+encryption.key"
     );
 
     if (!file) {
+      console.error(`[Download] File not found in DB: ${id}`);
       return next(new AppError("File not found", 404));
     }
 
-    // 1. Identify Provider & Chunk
-    // For now, we assume 1 chunk = 1 file on provider (Simple mode)
-    // In future with sharding, we'd need to merge streams.
-    const chunk = file.chunks[0];
-    if (!chunk) {
+    if (!file.chunks || file.chunks.length === 0) {
+      console.error(`[Download] No chunks found for file: ${id}`);
       return next(new AppError("File corruption: No chunks found", 500));
     }
 
-    let provider;
-    // Determine provider based on chunk info or user linked accounts
-    // We stored 'provider' in the chunk? No, we stored it in the manifest/distributor logic but maybe not in DB explicitly?
-    // Wait, the 'chunks' array in File model usually has { provider, providerId, ... }
-    // Let's check File model. Assuming it has provider info.
+    // Sort chunks by index to ensure correct order
+    const sortedChunks = file.chunks.sort((a, b) => a.index - b.index);
+    console.log(`[Download] Found ${sortedChunks.length} chunks.`);
 
-    // Fallback: Check user's linked accounts to instantiate the correct provider class
-    // But we need to know WHICH provider holds this specific chunk.
-    // Let's assume the chunk object has `provider` field.
-
-    const providerName = chunk.provider || "local-1"; // Default/Fallback
-
-    if (providerName.startsWith("google")) {
-      const googleAccount = req.user.linkedAccounts.find(
-        (acc) => acc.provider === "google"
-      );
-      if (!googleAccount) {
-        return next(new AppError("Google Drive account not linked", 403));
-      }
-      provider = new GoogleDriveProvider();
-      provider.setCredentials({
-        accessToken: googleAccount.accessToken,
-        refreshToken: googleAccount.refreshToken,
-        expiryDate: googleAccount.expiryDate,
-      });
-    } else {
-      // Local
-      provider = new LocalFileSystemProvider(providerName, {
-        storagePath: `./storage_mock/${
-          providerName === "local-1" ? "disk1" : "disk2"
-        }`,
-      });
-    }
-
-    // 2. Get Stream
-    const fileStream = await provider.download(chunk.providerFileId);
-
-    // 3. Decrypt
-    const key = Buffer.from(file.encryption.key, "hex");
-    const decipherStream = new DecipherStream(key);
-
-    // 4. Pipe to Response
+    // Prepare Response Headers
     res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
 
-    fileStream.pipe(decipherStream).pipe(res);
+    // Initialize Decipher
+    const key = Buffer.from(file.encryption.key, "hex");
+    const decipherStream = new DecipherStream(key);
 
+    // Pipe Decipher -> Response
+    decipherStream.pipe(res);
+
+    // Handle Decipher Errors
     decipherStream.on("error", (err) => {
       console.error("[Download] Decryption Error:", err);
-      if (!res.headersSent) next(err);
+      // We can't send a JSON error if headers are already sent, but we can log it.
+      // The stream will end abruptly.
     });
 
-    fileStream.on("error", (err) => {
-      console.error("[Download] Provider Stream Error:", err);
-      if (!res.headersSent) next(err);
+    // Helper to get provider instance
+    const getProvider = (chunk) => {
+      const providerName = chunk.provider || "local-1";
+      if (providerName.startsWith("google")) {
+        const googleAccount = req.user.linkedAccounts.find(
+          (acc) => acc.provider === "google"
+        );
+        if (!googleAccount) throw new Error("Google Drive account not linked");
+
+        const provider = new GoogleDriveProvider();
+        provider.setCredentials({
+          accessToken: googleAccount.accessToken,
+          refreshToken: googleAccount.refreshToken,
+          expiryDate: googleAccount.expiryDate,
+        });
+        return provider;
+      } else {
+        return new LocalFileSystemProvider(providerName, {
+          storagePath: `./storage_mock/${
+            providerName === "local-1" ? "disk1" : "disk2"
+          }`,
+        });
+      }
+    };
+
+    // Stream chunks sequentially
+    // We use a recursive function or async iteration to pipe one after another
+    const streamChunks = async () => {
+      try {
+        for (const chunk of sortedChunks) {
+          console.log(
+            `[Download] Fetching chunk ${chunk.index} from ${chunk.provider}`
+          );
+          const provider = getProvider(chunk);
+          const chunkStream = await provider.download(chunk.providerFileId);
+
+          await new Promise((resolve, reject) => {
+            chunkStream.pipe(decipherStream, { end: false }); // Don't end decipher yet
+            chunkStream.on("end", resolve);
+            chunkStream.on("error", reject);
+          });
+        }
+        // All chunks piped, now we can end the decipher stream
+        decipherStream.end();
+      } catch (err) {
+        console.error("[Download] Stream Error:", err);
+        if (!res.headersSent) next(err);
+        else decipherStream.destroy(err);
+      }
+    };
+
+    await streamChunks();
+  } catch (err) {
+    console.error("[Download] Controller Exception:", err);
+    next(err);
+  }
+};
+
+/**
+ * Handles file deletion.
+ *
+ * Pipeline:
+ * 1. Finds the file metadata in DB.
+ * 2. Iterates through all chunks.
+ * 3. Deletes each chunk from its respective cloud provider.
+ * 4. Removes the file record from the database.
+ */
+exports.deleteFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const file = await File.findOne({ _id: id, user: req.user._id });
+
+    if (!file) {
+      return next(new AppError("File not found", 404));
+    }
+
+    console.log(`[Delete] Deleting file: ${file.name} (${id})`);
+
+    // Delete chunks from providers
+    const deletePromises = file.chunks.map(async (chunk) => {
+      try {
+        let provider;
+        const providerName = chunk.provider || "local-1";
+
+        if (providerName.startsWith("google")) {
+          const googleAccount = req.user.linkedAccounts.find(
+            (acc) => acc.provider === "google"
+          );
+          if (googleAccount) {
+            provider = new GoogleDriveProvider();
+            provider.setCredentials({
+              accessToken: googleAccount.accessToken,
+              refreshToken: googleAccount.refreshToken,
+              expiryDate: googleAccount.expiryDate,
+            });
+          }
+        } else {
+          provider = new LocalFileSystemProvider(providerName, {
+            storagePath: `./storage_mock/${
+              providerName === "local-1" ? "disk1" : "disk2"
+            }`,
+          });
+        }
+
+        if (provider) {
+          await provider.delete(chunk.providerFileId);
+          console.log(
+            `[Delete] Deleted chunk from ${providerName}: ${chunk.providerFileId}`
+          );
+        }
+      } catch (err) {
+        console.error(
+          `[Delete] Failed to delete chunk from ${chunk.provider}:`,
+          err.message
+        );
+        // Continue deleting other chunks/file even if one fails
+      }
+    });
+
+    await Promise.all(deletePromises);
+
+    // Delete from DB
+    await File.deleteOne({ _id: id });
+
+    res.status(204).json({
+      status: "success",
+      data: null,
     });
   } catch (err) {
     next(err);

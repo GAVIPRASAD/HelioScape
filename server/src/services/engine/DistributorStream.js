@@ -1,7 +1,25 @@
 const { Writable } = require("stream");
 const { Readable } = require("stream");
 
+/**
+ * DistributorStream
+ *
+ * A Writable stream that receives file chunks and uploads them to cloud providers.
+ *
+ * Features:
+ * - Round-Robin Distribution: Distributes chunks evenly across available providers.
+ * - Manifest Generation: Tracks where each chunk is stored (Provider + File ID).
+ * - Backpressure Handling: Waits for uploads to complete before processing more chunks.
+ */
 class DistributorStream extends Writable {
+  /**
+   * @param {Array<Object>} providers - List of initialized CloudProvider instances.
+   * @param {Object} fileMetadata - Metadata about the file being uploaded.
+   * @param {string} fileMetadata.name - The original name of the file.
+   * @param {number} fileMetadata.size - The total size of the file in bytes.
+   * @param {string} [fileMetadata.type] - The MIME type of the file.
+   * @param {Object} [options={}] - Options for the Writable stream.
+   */
   constructor(providers, fileMetadata, options = {}) {
     super({ ...options, objectMode: true });
     this.providers = providers;

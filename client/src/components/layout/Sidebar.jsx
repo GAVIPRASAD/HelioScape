@@ -1,7 +1,13 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Settings, Cloud, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  Settings,
+  Cloud,
+  LogOut,
+  FileIcon,
+} from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES, APP_NAME } from "@/constants";
 
@@ -10,6 +16,7 @@ const Sidebar = ({ className }) => {
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: ROUTES.DASHBOARD },
+    { icon: FileIcon, label: "Files", href: "/files" },
     { icon: Settings, label: "Settings", href: ROUTES.SETTINGS },
   ];
 

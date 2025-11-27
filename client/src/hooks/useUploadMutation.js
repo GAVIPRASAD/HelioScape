@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -6,9 +6,10 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 const useUploadMutation = () => {
   const { token } = useAuthStore();
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (file) => {
+    mutationFn: async ({ file, onProgress }) => {
       const formData = new FormData();
       formData.append("file", file);
 
@@ -17,16 +18,20 @@ const useUploadMutation = () => {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${token}`,
         },
-        // Track upload progress if needed
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
-          console.log(`Upload Progress: ${percentCompleted}%`);
+          if (onProgress) {
+            onProgress(percentCompleted);
+          }
         },
       });
 
       return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
     },
   });
 };

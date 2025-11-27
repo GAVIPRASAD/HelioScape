@@ -1,7 +1,23 @@
 const { Transform } = require("stream");
 const crypto = require("crypto");
 
+/**
+ * DecipherStream
+ *
+ * A Transform stream that decrypts AES-256-GCM data.
+ *
+ * Logic Flow:
+ * 1. Reads the IV from the beginning of the stream.
+ * 2. Decrypts the body of the stream.
+ * 3. Extracts the Auth Tag from the end of the stream.
+ * 4. Verifies the Auth Tag to ensure data integrity.
+ *
+ * Input Format: [IV] + [Encrypted Data] + [Auth Tag]
+ */
 class DecipherStream extends Transform {
+  /**
+   * @param {Buffer} key - The 32-byte encryption key.
+   */
   constructor(key, options = {}) {
     super(options);
     this.algorithm = "aes-256-gcm";

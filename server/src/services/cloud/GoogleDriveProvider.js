@@ -163,8 +163,17 @@ class GoogleDriveProvider extends CloudProvider {
    * Delete a file.
    */
   async delete(fileId) {
-    const drive = google.drive({ version: "v3", auth: this.oauth2Client });
-    await drive.files.delete({ fileId: fileId });
+    try {
+      const drive = google.drive({ version: "v3", auth: this.oauth2Client });
+      await drive.files.delete({ fileId: fileId });
+      console.log(`[GoogleDrive] Deleted file: ${fileId}`);
+    } catch (error) {
+      console.error(
+        `[GoogleDrive] Delete failed for ${fileId}:`,
+        error.response ? error.response.data : error.message
+      );
+      throw error;
+    }
   }
 }
 
