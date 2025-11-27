@@ -385,18 +385,27 @@ const Files = () => {
       setIsPreviewOpen(true); // Open dialog immediately to show loader
 
       const token = useAuthStore.getState().token;
-      // Removed persistent toast as dialog shows loading state
 
-      const response = await axios.get(
-        `${API_URL}/files/${file._id}/download`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "blob",
-        }
-      );
+      // Use queryClient to fetch and cache the blob
+      const blobData = await queryClient.fetchQuery({
+        queryKey: ["file-preview", file._id],
+        queryFn: async () => {
+          const response = await axios.get(
+            `${API_URL}/files/${file._id}/download`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              responseType: "blob",
+            }
+          );
+          return response.data;
+        },
+        staleTime: 1000 * 60 * 10, // Cache for 10 minutes
+        gcTime: 1000 * 60 * 30, // Keep in garbage collection for 30 minutes
+        retry: false, // Fail immediately if download fails (don't keep user waiting)
+      });
 
       const url = window.URL.createObjectURL(
-        new Blob([response.data], { type: file.mimeType })
+        new Blob([blobData], { type: file.mimeType })
       );
       setPreviewUrl(url);
     } catch (error) {
@@ -427,6 +436,7 @@ const Files = () => {
         description: "File removed successfully.",
       });
       queryClient.invalidateQueries(["files"]);
+      queryClient.invalidateQueries(["quota"]);
       if (selectedFiles.has(fileId)) {
         const newSelected = new Set(selectedFiles);
         newSelected.delete(fileId);
@@ -463,6 +473,7 @@ const Files = () => {
         description: "Folder removed successfully.",
       });
       queryClient.invalidateQueries(["folders"]);
+      queryClient.invalidateQueries(["quota"]);
       if (selectedFolders.has(folderId)) {
         const newSelected = new Set(selectedFolders);
         newSelected.delete(folderId);
@@ -703,6 +714,7 @@ const Files = () => {
       setSelectedFolders(new Set());
       queryClient.invalidateQueries(["files"]);
       queryClient.invalidateQueries(["folders"]);
+      queryClient.invalidateQueries(["quota"]);
     } catch (error) {
       console.error("Bulk delete failed:", error);
       toast({
@@ -896,7 +908,11 @@ const Files = () => {
               </DialogHeader>
               <div className="mt-4">
                 <UploadZone
-                  onUploadComplete={() => setIsUploadOpen(false)}
+                  onUploadComplete={() => {
+                    setIsUploadOpen(false);
+                    queryClient.invalidateQueries(["files"]);
+                    queryClient.invalidateQueries(["quota"]);
+                  }}
                   folderId={currentFolderId}
                 />
               </div>

@@ -26,8 +26,10 @@ import { useToast } from "@/components/ui/use-toast";
 import axios from "axios";
 import { useAuthStore } from "@/store/useAuthStore";
 import NetworkTopology from "@/components/dashboard/NetworkTopology";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import ProviderCardSkeleton from "@/components/dashboard/ProviderCardSkeleton";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -36,6 +38,7 @@ const Dashboard = () => {
   const { data: files, isLoading: isFilesLoading } = useFilesQuery();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: quotaData, isLoading: isQuotaLoading } = useQuery({
     queryKey: ["quota"],
@@ -46,7 +49,8 @@ const Dashboard = () => {
       });
       return res.data.data.quotas;
     },
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: Infinity, // Only refetch on explicit invalidation (Smart Caching)
+    gcTime: 1000 * 60 * 60 * 24, // Keep in memory for 24 hours
   });
 
   const totalUsed = quotaData?.reduce((acc, q) => acc + (q.used || 0), 0) || 0;
@@ -129,7 +133,17 @@ const Dashboard = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="mt-6">
-              <UploadZone onUploadComplete={() => setIsUploadOpen(false)} />
+              <UploadZone
+                onUploadComplete={() => {
+                  setIsUploadOpen(false);
+                  queryClient.invalidateQueries({ queryKey: ["quota"] });
+                  queryClient.invalidateQueries({ queryKey: ["files"] });
+                  toast({
+                    title: "Upload Complete",
+                    description: "Storage stats updated.",
+                  });
+                }}
+              />
             </div>
           </DialogContent>
         </Dialog>
@@ -150,33 +164,47 @@ const Dashboard = () => {
             </h3>
 
             <div className="flex items-baseline gap-2 mb-6">
-              <span className="text-6xl font-heading font-bold text-slate-900 dark:text-white tracking-tighter">
-                {(totalUsed / (1024 * 1024 * 1024)).toFixed(2)}
-              </span>
+              {isQuotaLoading ? (
+                <Skeleton className="h-16 w-32" />
+              ) : (
+                <span className="text-6xl font-heading font-bold text-slate-900 dark:text-white tracking-tighter">
+                  {(totalUsed / (1024 * 1024 * 1024)).toFixed(2)}
+                </span>
+              )}
               <span className="text-xl text-slate-500 dark:text-slate-400">
-                GB Used
+                GB / {(totalLimit / (1024 * 1024 * 1024)).toFixed(2)} GB Used
               </span>
             </div>
 
             <div className="h-3 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden backdrop-blur-sm border border-slate-200 dark:border-white/5">
-              <div
-                className="h-full bg-gradient-to-r from-cyan-500 via-violet-500 to-emerald-500 transition-all duration-1000 relative"
-                style={{
-                  width: `${
-                    totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0
-                  }%`,
-                }}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse" />
-              </div>
+              {isQuotaLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-500 via-violet-500 to-emerald-500 transition-all duration-1000 relative"
+                  style={{
+                    width: `${
+                      totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0
+                    }%`,
+                  }}
+                >
+                  <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center mt-3 text-sm">
               <span className="text-cyan-600 dark:text-cyan-400 font-medium">
-                {totalLimit > 0
-                  ? ((totalUsed / totalLimit) * 100).toFixed(1)
-                  : 0}
-                % Capacity
+                {isQuotaLoading ? (
+                  <Skeleton className="h-4 w-12" />
+                ) : (
+                  <>
+                    {totalLimit > 0
+                      ? ((totalUsed / totalLimit) * 100).toFixed(1)
+                      : 0}
+                    % Capacity
+                  </>
+                )}
               </span>
               <span className="text-slate-500">Aggregated Cloud Storage</span>
             </div>
@@ -184,27 +212,46 @@ const Dashboard = () => {
         </div>
 
         {/* Provider Status Cards */}
-        {quotaData?.map((quota) => (
-          <ProviderCard
-            key={`${quota.provider}-${quota.providerId}`}
-            provider={
-              quota.provider === "google" ? `Google Drive` : quota.provider
-            }
-            subtext={quota.email}
-            isConnected={true}
-            quota={quota}
-          />
-        ))}
+        {isQuotaLoading ? (
+          <>
+            <ProviderCardSkeleton />
+            <ProviderCardSkeleton />
+            <ProviderCardSkeleton />
+          </>
+        ) : (
+          <>
+            {quotaData?.map((quota) => (
+              <ProviderCard
+                key={`${quota.provider}-${quota.providerId}`}
+                provider={
+                  quota.provider === "google" ? `Google Drive` : quota.provider
+                }
+                subtext={quota.email}
+                isConnected={true}
+                quota={quota}
+              />
+            ))}
 
-        {/* Placeholder for unconnected providers */}
-        {!quotaData?.some((q) => q.provider === "google") && (
-          <ProviderCard
-            provider="Google Drive"
-            isConnected={false}
-            quota={null}
-          />
+            {/* Placeholder for unconnected providers */}
+            {!quotaData?.some((q) => q.provider === "google") && (
+              <ProviderCard
+                provider="Google Drive"
+                isConnected={false}
+                quota={null}
+              />
+            )}
+            {!quotaData?.some((q) => q.provider === "dropbox") && (
+              <ProviderCard
+                provider="Dropbox"
+                isConnected={false}
+                quota={null}
+              />
+            )}
+            {!quotaData?.some((q) => q.provider === "mega") && (
+              <ProviderCard provider="MEGA" isConnected={false} quota={null} />
+            )}
+          </>
         )}
-        <ProviderCard provider="Dropbox" isConnected={false} quota={null} />
       </div>
 
       {/* Recent Transmissions & Network Visualizer */}

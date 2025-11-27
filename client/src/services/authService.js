@@ -51,3 +51,11 @@ export const unlinkAccount = async (provider, providerId) => {
   );
   return response.data;
 };
+export const megaLogin = async (email, password) => {
+  const response = await axios.post(
+    `${API_URL}/oauth/mega/login`,
+    { email, password },
+    getAuthHeader()
+  );
+  return response.data;
+};

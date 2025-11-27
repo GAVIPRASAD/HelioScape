@@ -11,11 +11,20 @@ module.exports = {
     CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     CALLBACK_URL:
-      process.env.GOOGLE_CALLBACK_URL ,
+      process.env.GOOGLE_CALLBACK_URL ||
+      "http://localhost:5000/api/oauth/google/callback",
   },
 
   DROPBOX: {
     CLIENT_ID: process.env.DROPBOX_CLIENT_ID,
     CLIENT_SECRET: process.env.DROPBOX_CLIENT_SECRET,
+    CALLBACK_URL:
+      process.env.DROPBOX_CALLBACK_URL ||
+      "http://localhost:5000/api/oauth/dropbox/callback",
+  },
+
+  MEGA: {
+    EMAIL: process.env.MEGA_EMAIL,
+    PASSWORD: process.env.MEGA_PASSWORD,
   },
 };

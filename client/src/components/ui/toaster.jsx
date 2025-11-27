@@ -12,7 +12,7 @@ export function Toaster() {
   const { toasts } = useToast();
 
   return (
-    <ToastProvider>
+    <ToastProvider duration={3000}>
       {toasts.map(function ({
         id,
         title,
@@ -61,7 +61,7 @@ export function Toaster() {
             {/* Dismiss Progress Bar */}
             <div className="absolute bottom-0 left-0 h-[2px] w-full bg-transparent">
               <div
-                className={`h-full ${progressColor} animate-[progress_5s_linear_forwards] origin-left opacity-80`}
+                className={`h-full ${progressColor} animate-[progress_3s_linear_forwards] origin-left opacity-80`}
               />
             </div>
           </Toast>

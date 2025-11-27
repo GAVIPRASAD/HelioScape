@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 const UploadManager = () => {
   const {
     uploadQueue,
@@ -29,6 +31,7 @@ const UploadManager = () => {
   } = useUploadStore();
   const { mutate: uploadFile } = useUploadMutation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const abortControllerRef = useRef(null);
   const currentUploadIdRef = useRef(null);
@@ -66,6 +69,15 @@ const UploadManager = () => {
           setProcessing(false);
           currentUploadIdRef.current = null;
           abortControllerRef.current = null;
+
+          toast({
+            title: "Upload Complete",
+            description: `${nextFile.file.name} uploaded successfully.`,
+          });
+
+          // Refresh data
+          queryClient.invalidateQueries({ queryKey: ["quota"] });
+          queryClient.invalidateQueries({ queryKey: ["files"] });
         },
         onError: (err) => {
           const isCanceled = err.code === "ERR_CANCELED";

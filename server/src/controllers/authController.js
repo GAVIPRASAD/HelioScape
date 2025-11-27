@@ -20,10 +20,12 @@ const sanitizeUser = (user) => {
   // Sanitize linked accounts
   if (userObj.linkedAccounts) {
     userObj.linkedAccounts = userObj.linkedAccounts.map((account) => ({
+      _id: account._id,
       provider: account.provider,
+      providerId: account.providerId,
       email: account.email,
       storageQuota: account.storageQuota,
-      // Exclude tokens, expiry, providerId
+      // Exclude tokens, expiry
     }));
   }
 

@@ -13,13 +13,26 @@ const oauthRoutes = require("./routes/oauthRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpecs = require("./utils/swagger");
+const crypto = require("crypto");
+
+// Polyfill for megajs which might expect global crypto
+if (!global.crypto) {
+  global.crypto = crypto;
+}
+// Ensure getRandomValues exists (Node 18 should have it, but just in case)
+if (!global.crypto.getRandomValues) {
+  global.crypto.getRandomValues = (buffer) => {
+    return crypto.randomFillSync(buffer);
+  };
+}
 
 const app = express();
 
 // Middleware
 app.use(helmet());
 app.use(cors({ origin: config.CLIENT_URL, credentials: true })); // Restrict CORS to client URL
-app.use(express.json());
+app.use(express.json({ limit: "500mb" }));
+app.use(express.urlencoded({ extended: true, limit: "500mb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 

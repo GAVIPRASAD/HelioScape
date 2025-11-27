@@ -6,6 +6,8 @@ const ShardStream = require("../services/engine/ShardStream");
 const DistributorStream = require("../services/engine/DistributorStream");
 const LocalFileSystemProvider = require("../services/cloud/LocalFileSystemProvider");
 const GoogleDriveProvider = require("../services/cloud/GoogleDriveProvider");
+const DropboxProvider = require("../services/cloud/DropboxProvider");
+const MegaProvider = require("../services/cloud/MegaProvider");
 const DecipherStream = require("../services/engine/DecipherStream");
 
 /**
@@ -81,8 +83,24 @@ exports.uploadFile = (req, res, next) => {
             });
 
             providers.push(provider);
+          } else if (account.provider === "dropbox") {
+            const provider = new DropboxProvider();
+            provider.setCredentials({
+              accessToken: account.accessToken,
+              refreshToken: account.refreshToken,
+              expiryDate: account.expiryDate,
+            });
+            provider.id = `dropbox-${account.providerId}`;
+            providers.push(provider);
+          } else if (account.provider === "mega") {
+            const provider = new MegaProvider();
+            provider.setCredentials({
+              accessToken: account.accessToken, // This is the session dump
+              email: account.email,
+            });
+            provider.id = `mega-${account.providerId}`;
+            providers.push(provider);
           }
-          // Add other providers here (dropbox, mega)
         }
       }
 
@@ -242,47 +260,88 @@ exports.downloadFile = async (req, res, next) => {
       // The stream will end abruptly.
     });
 
-    // Helper to get provider instance
-    const getProvider = (chunk) => {
+    // Helper to get ALL candidate providers for a chunk
+    const getCandidateProviders = (chunk) => {
       const providerName = chunk.provider || "local-1";
+      const candidates = [];
 
       if (providerName.startsWith("google")) {
-        // Extract providerId from "google-{providerId}"
-        // Note: providerId might contain hyphens, so we should be careful.
-        // But our format is `google-${account.providerId}`.
-        // Let's assume the prefix is "google-".
         const providerId = providerName.replace("google-", "");
 
-        const googleAccount = req.user.linkedAccounts.find(
+        // 1. Try specific account
+        const specific = req.user.linkedAccounts.find(
           (acc) => acc.provider === "google" && acc.providerId === providerId
         );
+        if (specific) candidates.push(createGoogleProvider(specific));
 
-        // Fallback: If not found by ID (maybe legacy file), try finding ANY google account?
-        // Or throw error? For strictness, throw error.
-        if (!googleAccount) {
-          // Try finding first google account as fallback for legacy files
-          const fallback = req.user.linkedAccounts.find(
-            (a) => a.provider === "google"
-          );
-          if (fallback) {
-            console.warn(
-              `[Download] Specific account ${providerId} not found, using fallback.`
-            );
-            // We can use fallback, but it might fail if file is not there.
-            // Let's use fallback for now to be safe.
-            return createGoogleProvider(fallback);
-          }
-          throw new Error(`Google Drive account (${providerId}) not linked`);
+        // 2. Add ALL other google accounts as fallback
+        const others = req.user.linkedAccounts.filter(
+          (acc) => acc.provider === "google" && acc.providerId !== providerId
+        );
+        others.forEach((acc) => candidates.push(createGoogleProvider(acc)));
+      } else if (providerName.startsWith("dropbox")) {
+        const providerId = providerName.replace("dropbox-", "");
+
+        const specific = req.user.linkedAccounts.find(
+          (acc) => acc.provider === "dropbox" && acc.providerId === providerId
+        );
+        if (specific) {
+          const p = new DropboxProvider();
+          p.setCredentials({
+            accessToken: specific.accessToken,
+            refreshToken: specific.refreshToken,
+            expiryDate: specific.expiryDate,
+          });
+          candidates.push(p);
         }
 
-        return createGoogleProvider(googleAccount);
-      } else {
-        return new LocalFileSystemProvider(providerName, {
-          storagePath: `./storage_mock/${
-            providerName === "local-1" ? "disk1" : "disk2"
-          }`,
+        const others = req.user.linkedAccounts.filter(
+          (acc) => acc.provider === "dropbox" && acc.providerId !== providerId
+        );
+        others.forEach((acc) => {
+          const p = new DropboxProvider();
+          p.setCredentials({
+            accessToken: acc.accessToken,
+            refreshToken: acc.refreshToken,
+            expiryDate: acc.expiryDate,
+          });
+          candidates.push(p);
         });
+      } else if (providerName.startsWith("mega")) {
+        const providerId = providerName.replace("mega-", "");
+
+        const specific = req.user.linkedAccounts.find(
+          (acc) => acc.provider === "mega" && acc.providerId === providerId
+        );
+        if (specific) {
+          const p = new MegaProvider();
+          p.setCredentials({
+            accessToken: specific.accessToken,
+            email: specific.email,
+          });
+          candidates.push(p);
+        }
+
+        const others = req.user.linkedAccounts.filter(
+          (acc) => acc.provider === "mega" && acc.providerId !== providerId
+        );
+        others.forEach((acc) => {
+          const p = new MegaProvider();
+          p.setCredentials({ accessToken: acc.accessToken, email: acc.email });
+          candidates.push(p);
+        });
+      } else {
+        // Local
+        candidates.push(
+          new LocalFileSystemProvider(providerName, {
+            storagePath: `./storage_mock/${
+              providerName === "local-1" ? "disk1" : "disk2"
+            }`,
+          })
+        );
       }
+
+      return candidates;
     };
 
     const createGoogleProvider = (account) => {
@@ -295,24 +354,50 @@ exports.downloadFile = async (req, res, next) => {
       return provider;
     };
 
-    // Stream chunks sequentially
-    // We use a recursive function or async iteration to pipe one after another
+    // Stream chunks sequentially with retry logic
     const streamChunks = async () => {
       try {
         for (const chunk of sortedChunks) {
           console.log(
-            `[Download] Fetching chunk ${chunk.index} from ${chunk.provider}`
+            `[Download] Processing chunk ${chunk.index} (${chunk.provider})`
           );
-          const provider = getProvider(chunk);
-          const chunkStream = await provider.download(chunk.providerFileId);
+
+          const providers = getCandidateProviders(chunk);
+          if (providers.length === 0) {
+            throw new Error(`No linked account found for ${chunk.provider}`);
+          }
+
+          let chunkStream = null;
+          let lastError = null;
+
+          // Try each provider until one works
+          for (const provider of providers) {
+            try {
+              console.log(`[Download] Trying provider instance...`);
+              chunkStream = await provider.download(chunk.providerFileId);
+              if (chunkStream) break; // Success
+            } catch (err) {
+              console.warn(`[Download] Failed with provider: ${err.message}`);
+              lastError = err;
+            }
+          }
+
+          if (!chunkStream) {
+            throw (
+              lastError ||
+              new Error(
+                `Failed to download chunk ${chunk.index} from any available account.`
+              )
+            );
+          }
 
           await new Promise((resolve, reject) => {
-            chunkStream.pipe(decipherStream, { end: false }); // Don't end decipher yet
+            chunkStream.pipe(decipherStream, { end: false });
             chunkStream.on("end", resolve);
             chunkStream.on("error", reject);
           });
         }
-        // All chunks piped, now we can end the decipher stream
+        // All chunks piped
         decipherStream.end();
       } catch (err) {
         console.error("[Download] Stream Error:", err);

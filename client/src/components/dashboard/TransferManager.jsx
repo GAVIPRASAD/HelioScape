@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useQueryClient } from "@tanstack/react-query";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -42,6 +43,7 @@ const TransferManager = () => {
 
   const { mutate: uploadFile } = useUploadMutation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const abortControllerRef = useRef(null);
   const currentUploadIdRef = useRef(null);
@@ -81,6 +83,15 @@ const TransferManager = () => {
           setUploading(false);
           currentUploadIdRef.current = null;
           abortControllerRef.current = null;
+
+          toast({
+            title: "Upload Complete",
+            description: `${nextFile.file.name} uploaded successfully.`,
+          });
+
+          // Refresh data
+          queryClient.invalidateQueries({ queryKey: ["quota"] });
+          queryClient.invalidateQueries({ queryKey: ["files"] });
         },
         onError: (err) => {
           const isCanceled = err.code === "ERR_CANCELED";

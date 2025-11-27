@@ -1,4 +1,6 @@
 const GoogleDriveProvider = require("../services/cloud/GoogleDriveProvider");
+const DropboxProvider = require("../services/cloud/DropboxProvider");
+const MegaProvider = require("../services/cloud/MegaProvider");
 const AppError = require("../utils/AppError");
 
 /**
@@ -53,8 +55,39 @@ exports.getQuota = async (req, res, next) => {
               email: account.email,
               ...quota,
             });
+          } else if (account.provider === "dropbox") {
+            const provider = new DropboxProvider();
+            // Dropbox doesn't need explicit setCredentials for getQuota if we pass tokenData,
+            // but let's follow the pattern if needed.
+            // DropboxProvider.getQuota takes tokenData directly.
+
+            const quota = await provider.getQuota({
+              accessToken: account.accessToken,
+              refreshToken: account.refreshToken,
+              expiryDate: account.expiryDate,
+            });
+
+            quotas.push({
+              provider: "dropbox",
+              providerId: account.providerId,
+              email: account.email,
+              ...quota,
+            });
+          } else if (account.provider === "mega") {
+            const provider = new MegaProvider();
+            // MEGA needs credentials (which are in accessToken for our proxy)
+
+            const quota = await provider.getQuota({
+              accessToken: account.accessToken, // Encrypted string
+            });
+
+            quotas.push({
+              provider: "mega",
+              providerId: account.providerId,
+              email: account.email,
+              ...quota,
+            });
           }
-          // Add other providers here
         } catch (err) {
           console.error(
             `[Quota] Failed to fetch quota for ${account.provider}:`,

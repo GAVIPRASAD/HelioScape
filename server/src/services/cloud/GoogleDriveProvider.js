@@ -25,6 +25,7 @@ class GoogleDriveProvider extends CloudProvider {
   async authenticate() {
     const scopes = [
       "https://www.googleapis.com/auth/drive.appdata", // Access only hidden app data folder
+      "https://www.googleapis.com/auth/drive.metadata.readonly", // Better metadata/quota access
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
     ];
@@ -68,6 +69,7 @@ class GoogleDriveProvider extends CloudProvider {
     });
 
     const quota = res.data.storageQuota;
+    console.log("[GoogleDrive] Raw Quota Response:", quota);
     return {
       total: parseInt(quota.limit, 10),
       used: parseInt(quota.usage, 10),

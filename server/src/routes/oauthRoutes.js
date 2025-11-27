@@ -11,6 +11,7 @@ router.get("/:provider", protect, oauthController.initiateAuth);
 // Handle OAuth callback (Server-side)
 // GET /api/oauth/:provider/callback
 router.get("/:provider/callback", oauthController.handleCallback);
+router.post("/mega/login", protect, oauthController.megaLogin); // Custom route for MEGA
 
 // Link a provider (Client-side flow)
 // POST /api/oauth/:provider/link

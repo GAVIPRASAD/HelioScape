@@ -29,7 +29,10 @@ const UserSchema = new mongoose.Schema(
         },
         providerId: { type: String, required: true },
         email: { type: String },
-        accessToken: { type: String, required: true }, // Encrypted
+        // SECURITY: This field is ENCRYPTED at rest.
+        // For MEGA: Contains JSON string of {email, password} for "Credentials Proxy".
+        // For OAuth: Contains the access token.
+        accessToken: { type: String, required: true },
         refreshToken: { type: String }, // Encrypted
         expiryDate: { type: Date },
         storageQuota: {
@@ -53,7 +56,7 @@ const UserSchema = new mongoose.Schema(
 
 // Encrypt sensitive fields
 UserSchema.plugin(fieldEncryption, {
-  fields: ["linkedAccounts.refreshToken"],
+  fields: ["linkedAccounts.accessToken", "linkedAccounts.refreshToken"],
   secret: config.JWT_SECRET, // Using JWT_SECRET for now, ideally separate DB_SECRET
 });
 
