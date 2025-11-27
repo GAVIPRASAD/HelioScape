@@ -11,6 +11,8 @@ router.get("/", uploadController.listFiles);
 router.get("/media", uploadController.listMedia);
 router.get("/search", uploadController.searchFiles);
 router.post("/", uploadController.uploadFile);
+router.get("/stats", uploadController.getStorageStats);
+router.get("/:id", uploadController.getFile);
 router.get("/:id/download", uploadController.downloadFile);
 router.delete("/:id", uploadController.deleteFile);
 /**

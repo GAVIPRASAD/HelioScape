@@ -187,16 +187,37 @@ exports.uploadFile = (req, res, next) => {
 
 exports.listFiles = async (req, res, next) => {
   try {
-    const { folderId } = req.query;
-    const query = { user: req.user._id, folder: folderId || null };
+    const { folderId, provider, page = 1, limit = 50 } = req.query;
+    const query = { user: req.user._id };
 
-    const files = await File.find(query).sort({
-      createdAt: -1,
-    });
+    // Folder filter
+    if (folderId !== "all") {
+      query.folder = folderId || null;
+    }
+
+    // Provider filter (for account details view)
+    if (provider) {
+      // Support comma-separated list for explicit legacy handling (e.g. "google-123,google")
+      const providers = provider.split(",");
+      query["chunks.provider"] = { $in: providers };
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [files, total] = await Promise.all([
+      File.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      File.countDocuments(query),
+    ]);
 
     res.status(200).json({
       status: "success",
       results: files.length,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
       data: { files },
     });
   } catch (err) {
@@ -425,6 +446,52 @@ exports.downloadFile = async (req, res, next) => {
 const FileService = require("../services/FileService");
 
 // ... (previous code)
+
+exports.getStorageStats = async (req, res, next) => {
+  try {
+    const stats = await File.aggregate([
+      { $match: { user: req.user._id } },
+      { $unwind: "$chunks" },
+      {
+        $group: {
+          _id: "$chunks.provider",
+          totalSize: { $sum: "$chunks.size" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const statsMap = stats.reduce((acc, curr) => {
+      acc[curr._id] = curr.totalSize;
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      status: "success",
+      data: { stats: statsMap },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const file = await File.findOne({ _id: id, user: req.user._id });
+
+    if (!file) {
+      return next(new AppError("File not found", 404));
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: { file },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 exports.deleteFile = async (req, res, next) => {
   try {

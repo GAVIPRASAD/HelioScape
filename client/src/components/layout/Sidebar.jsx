@@ -10,6 +10,8 @@ import {
   Network,
   User,
   Film,
+  PieChart,
+  Server,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES, APP_NAME } from "@/constants";
@@ -27,6 +29,8 @@ const Sidebar = ({ className, onItemClick }) => {
     { icon: Network, label: "Network Map", href: "/visualizer" },
     { icon: Film, label: "Media Center", href: "/media" },
     { icon: User, label: "Profile", href: "/profile" },
+    { icon: PieChart, label: "File Map", href: "/distribution/files" },
+    { icon: Server, label: "Account Map", href: "/distribution/accounts" },
     { icon: Settings, label: "System Config", href: ROUTES.SETTINGS },
   ];
 

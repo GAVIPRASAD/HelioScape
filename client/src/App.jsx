@@ -14,6 +14,9 @@ import Files from "@/pages/Files";
 import Visualizer from "@/pages/Visualizer";
 import ProfilePage from "@/pages/ProfilePage";
 import Media from "@/pages/Media";
+import FileDistribution from "@/pages/FileDistribution";
+import AccountDistribution from "@/pages/AccountDistribution";
+import AccountDetails from "@/pages/AccountDetails";
 
 function App() {
   // Initialize theme
@@ -45,6 +48,15 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/media" element={<Media />} />
+            <Route path="/distribution/files" element={<FileDistribution />} />
+            <Route
+              path="/distribution/accounts"
+              element={<AccountDistribution />}
+            />
+            <Route
+              path="/distribution/accounts/:provider/:providerId"
+              element={<AccountDetails />}
+            />
           </Route>
         </Route>
       </Routes>
