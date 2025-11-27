@@ -32,6 +32,7 @@ mongoose
 app.use("/api/auth", authRoutes);
 app.use("/api/oauth", oauthRoutes);
 app.use("/api/files", uploadRoutes);
+app.use("/api/folders", require("./routes/folderRoutes"));
 app.use("/api/providers", require("./routes/providerRoutes"));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 

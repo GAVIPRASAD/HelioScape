@@ -21,9 +21,25 @@ const DecipherStream = require("../services/engine/DecipherStream");
 exports.uploadFile = (req, res, next) => {
   const busboy = Busboy({ headers: req.headers });
 
+  let currentFolderId = null;
+
+  busboy.on("field", (fieldname, val) => {
+    if (fieldname === "folderId") {
+      currentFolderId = val === "null" || val === "undefined" ? null : val;
+    }
+  });
+
   busboy.on("file", async (fieldname, file, info) => {
     const { filename, mimeType } = info;
     console.log(`[Upload] Starting upload for: ${filename}`);
+
+    // We need to capture the folderId from the fields, but busboy processes fields separately.
+    // Since 'file' event might fire before or after 'field' events depending on client order,
+    // we usually need to ensure fields are sent BEFORE files in the FormData on client side.
+    // OR we can store the file stream and wait for fields?
+    // A simpler way with Busboy is to just assume fields come first if client behaves,
+    // OR use a variable that is populated by the 'field' event.
+    // Let's add a listener for fields.
 
     try {
       // 1. Prepare Providers
@@ -107,6 +123,7 @@ exports.uploadFile = (req, res, next) => {
           name: filename,
           size: manifest.totalSize,
           mimeType: mimeType,
+          folder: currentFolderId,
           encryption: {
             algorithm: "aes-256-gcm",
             // TODO: Encrypt this key with user's master key before saving!
@@ -152,7 +169,10 @@ exports.uploadFile = (req, res, next) => {
 
 exports.listFiles = async (req, res, next) => {
   try {
-    const files = await File.find({ user: req.user._id }).sort({
+    const { folderId } = req.query;
+    const query = { user: req.user._id, folder: folderId || null };
+
+    const files = await File.find(query).sort({
       createdAt: -1,
     });
 
@@ -202,6 +222,11 @@ exports.downloadFile = async (req, res, next) => {
     // Prepare Response Headers
     res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
+
+    // Decrypted size = Encrypted size - 32 bytes (16 bytes IV + 16 bytes Auth Tag)
+    if (file.size && file.size > 32) {
+      res.setHeader("Content-Length", file.size - 32);
+    }
 
     // Initialize Decipher
     const key = Buffer.from(file.encryption.key, "hex");
@@ -284,62 +309,22 @@ exports.downloadFile = async (req, res, next) => {
  * 3. Deletes each chunk from its respective cloud provider.
  * 4. Removes the file record from the database.
  */
+const FileService = require("../services/FileService");
+
+// ... (previous code)
+
 exports.deleteFile = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const file = await File.findOne({ _id: id, user: req.user._id });
 
-    if (!file) {
-      return next(new AppError("File not found", 404));
-    }
-
-    console.log(`[Delete] Deleting file: ${file.name} (${id})`);
-
-    // Delete chunks from providers
-    const deletePromises = file.chunks.map(async (chunk) => {
-      try {
-        let provider;
-        const providerName = chunk.provider || "local-1";
-
-        if (providerName.startsWith("google")) {
-          const googleAccount = req.user.linkedAccounts.find(
-            (acc) => acc.provider === "google"
-          );
-          if (googleAccount) {
-            provider = new GoogleDriveProvider();
-            provider.setCredentials({
-              accessToken: googleAccount.accessToken,
-              refreshToken: googleAccount.refreshToken,
-              expiryDate: googleAccount.expiryDate,
-            });
-          }
-        } else {
-          provider = new LocalFileSystemProvider(providerName, {
-            storagePath: `./storage_mock/${
-              providerName === "local-1" ? "disk1" : "disk2"
-            }`,
-          });
-        }
-
-        if (provider) {
-          await provider.delete(chunk.providerFileId);
-          console.log(
-            `[Delete] Deleted chunk from ${providerName}: ${chunk.providerFileId}`
-          );
-        }
-      } catch (err) {
-        console.error(
-          `[Delete] Failed to delete chunk from ${chunk.provider}:`,
-          err.message
-        );
-        // Continue deleting other chunks/file even if one fails
+    try {
+      await FileService.deleteFile(id, req.user);
+    } catch (err) {
+      if (err.message === "File not found") {
+        return next(new AppError("File not found", 404));
       }
-    });
-
-    await Promise.all(deletePromises);
-
-    // Delete from DB
-    await File.deleteOne({ _id: id });
+      throw err;
+    }
 
     res.status(204).json({
       status: "success",

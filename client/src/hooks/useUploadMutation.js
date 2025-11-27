@@ -9,15 +9,19 @@ const useUploadMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ file, onProgress }) => {
+    mutationFn: async ({ file, folderId, onProgress, signal }) => {
       const formData = new FormData();
       formData.append("file", file);
+      if (folderId) {
+        formData.append("folderId", folderId);
+      }
 
       const response = await axios.post(`${API_URL}/files`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${token}`,
         },
+        signal, // Pass the abort signal
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total

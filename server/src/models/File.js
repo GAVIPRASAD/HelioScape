@@ -6,6 +6,11 @@ const FileSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  folder: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Folder",
+    default: null, // null means root directory
+  },
   name: {
     type: String,
     required: true,
