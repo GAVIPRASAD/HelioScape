@@ -7,6 +7,7 @@ import {
   Cloud,
   LogOut,
   FileIcon,
+  Network,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES, APP_NAME } from "@/constants";
@@ -17,6 +18,7 @@ const Sidebar = ({ className }) => {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: ROUTES.DASHBOARD },
     { icon: FileIcon, label: "Files", href: "/files" },
+    { icon: Network, label: "Visualizer", href: "/visualizer" },
     { icon: Settings, label: "Settings", href: ROUTES.SETTINGS },
   ];
 

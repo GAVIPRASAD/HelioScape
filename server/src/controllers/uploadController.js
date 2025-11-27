@@ -334,3 +334,76 @@ exports.deleteFile = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Renames a file.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
+exports.renameFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name) {
+      return next(new AppError("New name is required", 400));
+    }
+
+    const file = await File.findOne({ _id: id, user: req.user._id });
+
+    if (!file) {
+      return next(new AppError("File not found", 404));
+    }
+
+    file.name = name;
+    await file.save();
+
+    res.status(200).json({
+      status: "success",
+      data: { file },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Moves a file to a different folder.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
+exports.moveFile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { folderId } = req.body; // folderId can be null for root
+
+    const file = await File.findOne({ _id: id, user: req.user._id });
+
+    if (!file) {
+      return next(new AppError("File not found", 404));
+    }
+
+    // Verify target folder exists if not root
+    if (folderId) {
+      const folder = await require("../models/Folder").findOne({
+        _id: folderId,
+        user: req.user._id,
+      });
+      if (!folder) {
+        return next(new AppError("Target folder not found", 404));
+      }
+    }
+
+    file.folder = folderId || null;
+    await file.save();
+
+    res.status(200).json({
+      status: "success",
+      data: { file },
+    });
+  } catch (err) {
+    next(err);
+  }
+};

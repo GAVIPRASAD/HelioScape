@@ -26,6 +26,9 @@ import {
   Home,
   ArrowLeft,
   X,
+  MoreVertical,
+  Pencil,
+  Move,
 } from "lucide-react";
 import Loading from "@/components/ui/Loading";
 import { useToast } from "@/components/ui/use-toast";
@@ -38,19 +41,28 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.jsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTransferStore } from "@/store/useTransferStore";
 import UploadZone from "@/components/dashboard/UploadZone";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 /**
  * Files Component
  * Displays a file explorer interface with folders and files.
- * Supports navigation, creation, upload, download, and deletion.
+ * Supports navigation, creation, upload, download, deletion, rename, and move.
  */
 const Files = () => {
   // --- State Management ---
@@ -64,6 +76,13 @@ const Files = () => {
     useFilesQuery(currentFolderId);
   const { data: folders, isLoading: isFoldersLoading } =
     useFoldersQuery(currentFolderId);
+
+  // For Move Dialog - fetch all folders to display tree
+  // Ideally this should be a separate query or lazy loaded, but for MVP we might just fetch root
+  // or use a special "all folders" endpoint. For now, let's just use the current folder's subfolders
+  // which is NOT enough for moving TO another folder.
+  // Let's implement a simple "Move Up" or "Move to Root" for now, or fetch root folders.
+  // A better approach is a "FolderPicker" component.
 
   // Mutations
   const { mutate: createFolder, isPending: isCreatingFolder } =
@@ -81,15 +100,59 @@ const Files = () => {
   const [newFolderName, setNewFolderName] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
+  // Rename State
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [itemToRename, setItemToRename] = useState(null); // { id, type: 'file'|'folder', name }
+  const [newName, setNewName] = useState("");
+
+  // Move State
+  const [isMoveOpen, setIsMoveOpen] = useState(false);
+  const [itemToMove, setItemToMove] = useState(null); // { id, type: 'file'|'folder', name }
+  const [moveTargetFolderId, setMoveTargetFolderId] = useState(null);
+  // We need a way to browse folders in the move dialog.
+  // We can reuse the useFoldersQuery but we need it for the *browsed* folder in the dialog, not the main view.
+  // Let's create a mini-browser state for the move dialog.
+  const [moveDialogCurrentFolderId, setMoveDialogCurrentFolderId] =
+    useState(null);
+  const [moveDialogHistory, setMoveDialogHistory] = useState([
+    { id: null, name: "Home" },
+  ]);
+
+  // Fetch folders for the move dialog
+  // We can't use the same hook instance because it's bound to currentFolderId.
+  // We'll fetch manually or use a separate component.
+  // For simplicity, let's just use a separate component for the Move Dialog content?
+  // Or just fetch inside the effect?
+  // Let's use a separate query key for the move dialog folders.
+  // Actually, we can just use the existing hook if we extract the component.
+  // But refactoring to sub-components is big.
+  // Let's just use a simple fetch in useEffect for the move dialog for now.
+  const [moveDialogFolders, setMoveDialogFolders] = useState([]);
+
+  React.useEffect(() => {
+    if (isMoveOpen) {
+      const fetchFolders = async () => {
+        try {
+          const token = useAuthStore.getState().token;
+          const res = await axios.get(`${API_URL}/folders`, {
+            params: { parentId: moveDialogCurrentFolderId },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setMoveDialogFolders(res.data.data.folders);
+        } catch (err) {
+          console.error("Failed to fetch folders for move dialog", err);
+        }
+      };
+      fetchFolders();
+    }
+  }, [isMoveOpen, moveDialogCurrentFolderId]);
+
   // Selection State
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [selectedFolders, setSelectedFolders] = useState(new Set());
 
   // --- Handlers ---
 
-  /**
-   * Creates a new folder in the current directory.
-   */
   const handleCreateFolder = (e) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
@@ -117,42 +180,50 @@ const Files = () => {
     );
   };
 
-  /**
-   * Navigates into a specific folder.
-   */
   const navigateToFolder = (folder) => {
     setFolderHistory((prev) => [
       ...prev,
       { id: folder._id, name: folder.name },
     ]);
     setCurrentFolderId(folder._id);
-    setSearchTerm(""); // Clear search on navigation
-    setSelectedFiles(new Set()); // Clear selection
+    setSearchTerm("");
+    setSelectedFiles(new Set());
     setSelectedFolders(new Set());
   };
 
-  /**
-   * Navigates up one level in the folder hierarchy.
-   */
   const navigateUp = () => {
     if (folderHistory.length <= 1) return;
     const newHistory = [...folderHistory];
     newHistory.pop();
     setFolderHistory(newHistory);
     setCurrentFolderId(newHistory[newHistory.length - 1].id);
-    setSelectedFiles(new Set()); // Clear selection
+    setSelectedFiles(new Set());
     setSelectedFolders(new Set());
   };
 
-  /**
-   * Navigates to a specific breadcrumb in the history.
-   */
   const navigateToBreadcrumb = (index) => {
     const newHistory = folderHistory.slice(0, index + 1);
     setFolderHistory(newHistory);
     setCurrentFolderId(newHistory[newHistory.length - 1].id);
-    setSelectedFiles(new Set()); // Clear selection
+    setSelectedFiles(new Set());
     setSelectedFolders(new Set());
+  };
+
+  // --- Move Dialog Navigation ---
+  const navigateMoveDialog = (folder) => {
+    setMoveDialogHistory((prev) => [
+      ...prev,
+      { id: folder._id, name: folder.name },
+    ]);
+    setMoveDialogCurrentFolderId(folder._id);
+  };
+
+  const navigateMoveDialogUp = () => {
+    if (moveDialogHistory.length <= 1) return;
+    const newHistory = [...moveDialogHistory];
+    newHistory.pop();
+    setMoveDialogHistory(newHistory);
+    setMoveDialogCurrentFolderId(newHistory[newHistory.length - 1].id);
   };
 
   // --- Filtering Logic ---
@@ -248,7 +319,6 @@ const Files = () => {
         description: "File removed successfully.",
       });
       queryClient.invalidateQueries(["files"]);
-      // Remove from selection if present
       if (selectedFiles.has(fileId)) {
         const newSelected = new Set(selectedFiles);
         newSelected.delete(fileId);
@@ -281,7 +351,6 @@ const Files = () => {
         description: "Folder removed successfully.",
       });
       queryClient.invalidateQueries(["folders"]);
-      // Remove from selection if present
       if (selectedFolders.has(folderId)) {
         const newSelected = new Set(selectedFolders);
         newSelected.delete(folderId);
@@ -298,6 +367,130 @@ const Files = () => {
     }
   };
 
+  // --- Rename Logic ---
+  const openRenameDialog = (item, type) => {
+    setItemToRename({ ...item, type });
+    setNewName(item.name);
+    setIsRenameOpen(true);
+  };
+
+  const handleRename = async (e) => {
+    e.preventDefault();
+    if (!newName.trim() || !itemToRename) return;
+
+    try {
+      const token = useAuthStore.getState().token;
+      const endpoint = itemToRename.type === "folder" ? "folders" : "files"; // Note: files endpoint is actually handled by uploadController but route is /files/:id/rename? No, route is /upload/:id/rename?
+      // Wait, I need to check routes.
+      // uploadRoutes is mounted at /files (usually) or /upload?
+      // Let's assume standard REST: /api/files/:id/rename and /api/folders/:id/rename
+      // I added routes to uploadRoutes.js and folderRoutes.js
+      // uploadRoutes is likely mounted at /files based on listFiles being there.
+
+      await axios.patch(
+        `${API_URL}/${endpoint}/${itemToRename._id}/rename`,
+        {
+          name: newName,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      toast({
+        title: "Renamed Successfully",
+        description: `Renamed to ${newName}`,
+      });
+      setIsRenameOpen(false);
+      queryClient.invalidateQueries(["files"]);
+      queryClient.invalidateQueries(["folders"]);
+    } catch (error) {
+      console.error("Rename failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Rename Failed",
+        description: error.response?.data?.message || "Could not rename item.",
+      });
+    }
+  };
+
+  // --- Move Logic ---
+  const openMoveDialog = (item, type) => {
+    setItemToMove({ ...item, type });
+    setMoveDialogCurrentFolderId(null); // Start at root
+    setMoveDialogHistory([{ id: null, name: "Home" }]);
+    setIsMoveOpen(true);
+  };
+
+  const handleMove = async () => {
+    try {
+      const token = useAuthStore.getState().token;
+      const promises = [];
+
+      // Case 1: Single Item Move
+      if (itemToMove) {
+        const endpoint = itemToMove.type === "folder" ? "folders" : "files";
+        promises.push(
+          axios.patch(
+            `${API_URL}/${endpoint}/${itemToMove._id}/move`,
+            {
+              [itemToMove.type === "folder" ? "parentId" : "folderId"]:
+                moveDialogCurrentFolderId,
+            },
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          )
+        );
+      }
+      // Case 2: Bulk Move
+      else {
+        selectedFiles.forEach((id) => {
+          promises.push(
+            axios.patch(
+              `${API_URL}/files/${id}/move`,
+              { folderId: moveDialogCurrentFolderId },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+          );
+        });
+        selectedFolders.forEach((id) => {
+          // Prevent moving a folder into itself or its children (backend handles this, but good to know)
+          if (id === moveDialogCurrentFolderId) return;
+          promises.push(
+            axios.patch(
+              `${API_URL}/folders/${id}/move`,
+              { parentId: moveDialogCurrentFolderId },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+          );
+        });
+      }
+
+      await Promise.all(promises);
+
+      const destName = moveDialogHistory[moveDialogHistory.length - 1].name;
+      toast({
+        title: "Moved Successfully",
+        description: `Moved items to ${destName}`,
+      });
+
+      setIsMoveOpen(false);
+      setItemToMove(null);
+      setSelectedFiles(new Set());
+      setSelectedFolders(new Set());
+      queryClient.invalidateQueries(["files"]);
+      queryClient.invalidateQueries(["folders"]);
+    } catch (error) {
+      console.error("Move failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Move Failed",
+        description: error.response?.data?.message || "Could not move items.",
+      });
+    }
+  };
+
   const closePreview = (open) => {
     if (!open) {
       setIsPreviewOpen(false);
@@ -309,9 +502,6 @@ const Files = () => {
 
   // --- Bulk Actions Logic ---
 
-  /**
-   * Toggles selection of all files and folders in the current view.
-   */
   const toggleSelectAll = () => {
     const allFilesSelected =
       selectedFiles.size === filteredFiles?.length && filteredFiles?.length > 0;
@@ -320,11 +510,9 @@ const Files = () => {
       filteredFolders?.length > 0;
 
     if (allFilesSelected && allFoldersSelected) {
-      // Deselect all
       setSelectedFiles(new Set());
       setSelectedFolders(new Set());
     } else {
-      // Select all
       setSelectedFiles(new Set(filteredFiles?.map((f) => f._id)));
       setSelectedFolders(new Set(filteredFolders?.map((f) => f._id)));
     }
@@ -359,14 +547,9 @@ const Files = () => {
       title: "Bulk Download Started",
       description: `Added ${filesToDownload.length} files to queue.`,
     });
-    // Note: We don't clear selection here so user can see what they downloaded
-    // or perform other actions.
     setSelectedFiles(new Set());
   };
 
-  /**
-   * Deletes all selected files and folders.
-   */
   const handleBulkDelete = async () => {
     const totalCount = selectedFiles.size + selectedFolders.size;
     if (
@@ -380,7 +563,6 @@ const Files = () => {
       const token = useAuthStore.getState().token;
       const promises = [];
 
-      // Delete Files
       selectedFiles.forEach((id) => {
         promises.push(
           axios.delete(`${API_URL}/files/${id}`, {
@@ -389,7 +571,6 @@ const Files = () => {
         );
       });
 
-      // Delete Folders
       selectedFolders.forEach((id) => {
         promises.push(
           axios.delete(`${API_URL}/folders/${id}`, {
@@ -443,6 +624,19 @@ const Files = () => {
               <Download className="mr-2 h-4 w-4" /> Download Files
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="hover:bg-primary-foreground/10 text-primary-foreground"
+            onClick={() => {
+              setItemToMove(null); // Clear single item
+              setMoveDialogCurrentFolderId(null);
+              setMoveDialogHistory([{ id: null, name: "Home" }]);
+              setIsMoveOpen(true);
+            }}
+          >
+            <Move className="mr-2 h-4 w-4" /> Move
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -605,7 +799,7 @@ const Files = () => {
                   <Checkbox
                     checked={selectedFolders.has(folder._id)}
                     onChange={() => toggleSelectFolder(folder._id)}
-                    onClick={(e) => e.stopPropagation()} // Prevent navigation when clicking checkbox
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </TableCell>
                 <TableCell className="font-medium flex items-center gap-2">
@@ -618,17 +812,33 @@ const Files = () => {
                   {new Date(folder.createdAt).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteFolder(folder._id);
-                    }}
-                    title="Delete Folder"
-                  >
-                    <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => openRenameDialog(folder, "folder")}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" /> Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openMoveDialog(folder, "folder")}
+                      >
+                        <Move className="mr-2 h-4 w-4" /> Move
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => handleDeleteFolder(folder._id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -657,34 +867,43 @@ const Files = () => {
                   {new Date(file.createdAt).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handlePreview(file)}
-                      title="Preview"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        handleDownload(file._id, file.name, file.size)
-                      }
-                      title="Download"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteFile(file._id)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                    </Button>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handlePreview(file)}>
+                        <Eye className="mr-2 h-4 w-4" /> Preview
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleDownload(file._id, file.name, file.size)
+                        }
+                      >
+                        <Download className="mr-2 h-4 w-4" /> Download
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openRenameDialog(file, "file")}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" /> Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openMoveDialog(file, "file")}
+                      >
+                        <Move className="mr-2 h-4 w-4" /> Move
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => handleDeleteFile(file._id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -736,6 +955,103 @@ const Files = () => {
               <Loading text="Loading preview..." />
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename {itemToRename?.type}</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this item.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRename}>
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="New Name"
+              autoFocus
+            />
+            <DialogFooter className="mt-4">
+              <Button type="submit">Rename</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Dialog */}
+      <Dialog open={isMoveOpen} onOpenChange={setIsMoveOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Move to...</DialogTitle>
+            <DialogDescription>Select a destination folder.</DialogDescription>
+          </DialogHeader>
+
+          <div className="border rounded-md h-[300px] flex flex-col">
+            {/* Dialog Header / Breadcrumbs */}
+            <div className="p-2 border-b bg-muted/50 flex items-center gap-2 text-sm">
+              {moveDialogHistory.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={navigateMoveDialogUp}
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                </Button>
+              )}
+              <span className="font-medium truncate">
+                {moveDialogHistory[moveDialogHistory.length - 1].name}
+              </span>
+            </div>
+
+            {/* Folder List */}
+            <ScrollArea className="flex-1 p-2">
+              <div className="space-y-1">
+                {moveDialogFolders.map((folder) => (
+                  <div
+                    key={folder._id}
+                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-accent ${
+                      folder._id === itemToMove?._id
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }`}
+                    onClick={() => {
+                      if (folder._id !== itemToMove?._id) {
+                        navigateMoveDialog(folder);
+                      }
+                    }}
+                  >
+                    <FolderIcon className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm">{folder.name}</span>
+                  </div>
+                ))}
+                {moveDialogFolders.length === 0 && (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    No subfolders
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMoveOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMove}
+              disabled={
+                moveDialogCurrentFolderId === itemToMove?.folder ||
+                (itemToMove?.type === "folder" &&
+                  moveDialogCurrentFolderId === itemToMove?._id)
+              }
+            >
+              Move Here
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

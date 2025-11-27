@@ -11,6 +11,7 @@ import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Files from "@/pages/Files";
+import Visualizer from "@/pages/Visualizer";
 
 function App() {
   // Initialize theme
@@ -38,6 +39,7 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/files" element={<Files />} />
+            <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
