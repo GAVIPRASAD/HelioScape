@@ -12,6 +12,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Files from "@/pages/Files";
 import Visualizer from "@/pages/Visualizer";
+import ProfilePage from "@/pages/ProfilePage";
 
 function App() {
   // Initialize theme
@@ -41,6 +42,7 @@ function App() {
             <Route path="/files" element={<Files />} />
             <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
       </Routes>
