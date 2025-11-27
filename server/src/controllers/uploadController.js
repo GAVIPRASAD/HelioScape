@@ -436,11 +436,51 @@ exports.moveFile = async (req, res, next) => {
   }
 };
 /**
- * Searches for files and folders by name.
+ * Lists media files with pagination and filtering.
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next middleware
  */
+exports.listMedia = async (req, res, next) => {
+  try {
+    const { type, page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const query = { user: req.user._id };
+
+    if (type === "photos") {
+      query.mimeType = { $regex: "^image/" };
+    } else if (type === "videos") {
+      query.mimeType = { $regex: "^video/" };
+    } else if (type === "audio") {
+      query.mimeType = { $regex: "^audio/" };
+    } else {
+      // All media
+      query.mimeType = { $regex: "^(image|video|audio)/" };
+    }
+
+    const [files, total] = await Promise.all([
+      File.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .select("name size mimeType createdAt updatedAt"), // Select only necessary fields
+      File.countDocuments(query),
+    ]);
+
+    res.status(200).json({
+      status: "success",
+      results: files.length,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      data: { files },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.searchFiles = async (req, res, next) => {
   try {
     const { q } = req.query;

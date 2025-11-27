@@ -13,6 +13,7 @@ import Register from "@/pages/Register";
 import Files from "@/pages/Files";
 import Visualizer from "@/pages/Visualizer";
 import ProfilePage from "@/pages/ProfilePage";
+import Media from "@/pages/Media";
 
 function App() {
   // Initialize theme
@@ -43,6 +44,7 @@ function App() {
             <Route path="/visualizer" element={<Visualizer />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/media" element={<Media />} />
           </Route>
         </Route>
       </Routes>

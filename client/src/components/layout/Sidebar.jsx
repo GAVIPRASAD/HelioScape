@@ -9,6 +9,7 @@ import {
   FileIcon,
   Network,
   User,
+  Film,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES, APP_NAME } from "@/constants";
@@ -24,6 +25,7 @@ const Sidebar = ({ className, onItemClick }) => {
     },
     { icon: FileIcon, label: "File Systems", href: "/files" },
     { icon: Network, label: "Network Map", href: "/visualizer" },
+    { icon: Film, label: "Media Center", href: "/media" },
     { icon: User, label: "Profile", href: "/profile" },
     { icon: Settings, label: "System Config", href: ROUTES.SETTINGS },
   ];
