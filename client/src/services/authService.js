@@ -44,9 +44,9 @@ export const linkAccount = async (provider, code) => {
   return response.data;
 };
 
-export const unlinkAccount = async (provider) => {
+export const unlinkAccount = async (provider, providerId) => {
   const response = await axios.delete(
-    `${API_URL}/oauth/${provider}`,
+    `${API_URL}/oauth/${provider}/${providerId}`,
     getAuthHeader()
   );
   return response.data;

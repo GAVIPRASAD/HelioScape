@@ -67,7 +67,8 @@ exports.handleCallback = async (req, res, next) => {
     }
 
     const existingIndex = user.linkedAccounts.findIndex(
-      (acc) => acc.provider === provider
+      (acc) =>
+        acc.provider === provider && acc.providerId === tokenData.providerId
     );
 
     const newAccount = {
@@ -118,9 +119,10 @@ exports.linkAccount = async (req, res, next) => {
     // Update User
     const user = await User.findById(userId);
 
-    // Check if already linked
+    // Check if THIS specific account is already linked
     const existingIndex = user.linkedAccounts.findIndex(
-      (acc) => acc.provider === provider
+      (acc) =>
+        acc.provider === provider && acc.providerId === tokenData.providerId
     );
 
     const newAccount = {
@@ -133,8 +135,10 @@ exports.linkAccount = async (req, res, next) => {
     };
 
     if (existingIndex > -1) {
+      // Update existing account (e.g. refresh token)
       user.linkedAccounts[existingIndex] = newAccount;
     } else {
+      // Add new account
       user.linkedAccounts.push(newAccount);
     }
 
@@ -152,11 +156,11 @@ exports.linkAccount = async (req, res, next) => {
 
 exports.unlinkProvider = async (req, res, next) => {
   try {
-    const { provider } = req.params;
+    const { provider, providerId } = req.params;
     const user = await User.findById(req.user.id);
 
     user.linkedAccounts = user.linkedAccounts.filter(
-      (acc) => acc.provider !== provider
+      (acc) => !(acc.provider === provider && acc.providerId === providerId)
     );
     await user.save();
 

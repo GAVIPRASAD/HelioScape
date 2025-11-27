@@ -17,7 +17,12 @@ router.get("/:provider/callback", oauthController.handleCallback);
 router.post("/:provider/link", protect, oauthController.linkAccount);
 
 // Unlink a provider
-// DELETE /api/oauth/:provider
-router.delete("/:provider", protect, oauthController.unlinkProvider);
+// Unlink a specific account
+// DELETE /api/oauth/:provider/:providerId
+router.delete(
+  "/:provider/:providerId",
+  protect,
+  oauthController.unlinkProvider
+);
 
 module.exports = router;

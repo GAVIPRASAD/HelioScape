@@ -32,9 +32,9 @@ const Settings = () => {
     }
   };
 
-  const handleUnlink = async (provider) => {
+  const handleUnlink = async (provider, providerId) => {
     try {
-      await unlinkAccount(provider);
+      await unlinkAccount(provider, providerId);
       toast({
         title: "Success",
         description: `Unlinked ${provider} successfully.`,
@@ -72,27 +72,47 @@ const Settings = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Google Drive */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-                G
+          {/* Google Drive */}
+          <div className="p-4 border rounded-lg space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
+                  G
+                </div>
+                <div>
+                  <p className="font-medium">Google Drive</p>
+                  <p className="text-sm text-muted-foreground">
+                    Link multiple accounts for more storage.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Google Drive</p>
-                <p className="text-sm text-muted-foreground">
-                  {user?.linkedAccounts?.find((a) => a.provider === "google")
-                    ? "Connected"
-                    : "Not connected"}
-                </p>
-              </div>
+              <Button onClick={() => handleLink("google")}>Add Account</Button>
             </div>
-            {user?.linkedAccounts?.find((a) => a.provider === "google") ? (
-              <Button variant="outline" onClick={() => handleUnlink("google")}>
-                Unlink
-              </Button>
-            ) : (
-              <Button onClick={() => handleLink("google")}>Connect</Button>
-            )}
+
+            {/* List Linked Accounts */}
+            {user?.linkedAccounts
+              ?.filter((a) => a.provider === "google")
+              .map((account) => (
+                <div
+                  key={account.providerId}
+                  className="flex items-center justify-between p-3 bg-secondary/20 rounded-md"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="text-sm font-medium">
+                      {account.email || "Linked Account"}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleUnlink("google", account.providerId)}
+                  >
+                    Unlink
+                  </Button>
+                </div>
+              ))}
           </div>
 
           {/* Dropbox (Placeholder) */}

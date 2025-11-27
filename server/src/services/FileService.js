@@ -24,9 +24,18 @@ class FileService {
         const providerName = chunk.provider || "local-1";
 
         if (providerName.startsWith("google")) {
-          const googleAccount = user.linkedAccounts.find(
-            (acc) => acc.provider === "google"
+          const providerId = providerName.replace("google-", "");
+          let googleAccount = user.linkedAccounts.find(
+            (acc) => acc.provider === "google" && acc.providerId === providerId
           );
+
+          // Fallback for legacy
+          if (!googleAccount) {
+            googleAccount = user.linkedAccounts.find(
+              (a) => a.provider === "google"
+            );
+          }
+
           if (googleAccount) {
             provider = new GoogleDriveProvider();
             provider.setCredentials({

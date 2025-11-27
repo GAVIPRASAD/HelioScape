@@ -48,7 +48,6 @@ const Dashboard = () => {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  const googleQuota = quotaData?.find((q) => q.provider === "google");
   const totalUsed = quotaData?.reduce((acc, q) => acc + (q.used || 0), 0) || 0;
   const totalLimit =
     quotaData?.reduce((acc, q) => acc + (q.total || 0), 0) || 0;
@@ -166,13 +165,27 @@ const Dashboard = () => {
         </Card>
 
         {/* Provider Status Cards */}
-        <ProviderCard
-          provider="Google Drive"
-          isConnected={
-            !!user?.linkedAccounts?.find((a) => a.provider === "google")
-          }
-          quota={googleQuota || null}
-        />
+        {quotaData?.map((quota) => (
+          <ProviderCard
+            key={`${quota.provider}-${quota.providerId}`}
+            provider={
+              quota.provider === "google"
+                ? `Google Drive (${quota.email || "Linked"})`
+                : quota.provider
+            }
+            isConnected={true}
+            quota={quota}
+          />
+        ))}
+
+        {/* Placeholder for unconnected providers if none exist */}
+        {!quotaData?.some((q) => q.provider === "google") && (
+          <ProviderCard
+            provider="Google Drive"
+            isConnected={false}
+            quota={null}
+          />
+        )}
         <ProviderCard provider="Dropbox" isConnected={false} quota={null} />
       </div>
 

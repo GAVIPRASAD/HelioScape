@@ -245,19 +245,37 @@ exports.downloadFile = async (req, res, next) => {
     // Helper to get provider instance
     const getProvider = (chunk) => {
       const providerName = chunk.provider || "local-1";
-      if (providerName.startsWith("google")) {
-        const googleAccount = req.user.linkedAccounts.find(
-          (acc) => acc.provider === "google"
-        );
-        if (!googleAccount) throw new Error("Google Drive account not linked");
 
-        const provider = new GoogleDriveProvider();
-        provider.setCredentials({
-          accessToken: googleAccount.accessToken,
-          refreshToken: googleAccount.refreshToken,
-          expiryDate: googleAccount.expiryDate,
-        });
-        return provider;
+      if (providerName.startsWith("google")) {
+        // Extract providerId from "google-{providerId}"
+        // Note: providerId might contain hyphens, so we should be careful.
+        // But our format is `google-${account.providerId}`.
+        // Let's assume the prefix is "google-".
+        const providerId = providerName.replace("google-", "");
+
+        const googleAccount = req.user.linkedAccounts.find(
+          (acc) => acc.provider === "google" && acc.providerId === providerId
+        );
+
+        // Fallback: If not found by ID (maybe legacy file), try finding ANY google account?
+        // Or throw error? For strictness, throw error.
+        if (!googleAccount) {
+          // Try finding first google account as fallback for legacy files
+          const fallback = req.user.linkedAccounts.find(
+            (a) => a.provider === "google"
+          );
+          if (fallback) {
+            console.warn(
+              `[Download] Specific account ${providerId} not found, using fallback.`
+            );
+            // We can use fallback, but it might fail if file is not there.
+            // Let's use fallback for now to be safe.
+            return createGoogleProvider(fallback);
+          }
+          throw new Error(`Google Drive account (${providerId}) not linked`);
+        }
+
+        return createGoogleProvider(googleAccount);
       } else {
         return new LocalFileSystemProvider(providerName, {
           storagePath: `./storage_mock/${
@@ -265,6 +283,16 @@ exports.downloadFile = async (req, res, next) => {
           }`,
         });
       }
+    };
+
+    const createGoogleProvider = (account) => {
+      const provider = new GoogleDriveProvider();
+      provider.setCredentials({
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        expiryDate: account.expiryDate,
+      });
+      return provider;
     };
 
     // Stream chunks sequentially

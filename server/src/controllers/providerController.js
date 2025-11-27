@@ -24,7 +24,8 @@ exports.getQuota = async (req, res, next) => {
             provider.onTokenRefresh(async (newTokens) => {
               console.log("[GoogleDrive] Token Refreshed during quota check!");
               const accountIndex = req.user.linkedAccounts.findIndex(
-                (a) => a.provider === "google"
+                (a) =>
+                  a.provider === "google" && a.providerId === account.providerId
               );
               if (accountIndex !== -1) {
                 req.user.linkedAccounts[accountIndex].accessToken =
@@ -48,6 +49,8 @@ exports.getQuota = async (req, res, next) => {
 
             quotas.push({
               provider: "google",
+              providerId: account.providerId,
+              email: account.email,
               ...quota,
             });
           }
@@ -60,6 +63,8 @@ exports.getQuota = async (req, res, next) => {
           // Return error state for this provider but don't fail the whole request
           quotas.push({
             provider: account.provider,
+            providerId: account.providerId,
+            email: account.email,
             error: "Failed to fetch quota",
             total: 0,
             used: 0,
