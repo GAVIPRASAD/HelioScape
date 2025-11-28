@@ -1,0 +1,148 @@
+/* Custom Tour Styles for HelioScape (Clean Slate Theme) */
+
+/* 
+   DRIVER.JS OVERRIDES 
+   A clean, solid design without glassmorphism or gradients.
+   Matches the application's standard dialogs.
+*/
+
+.driver-popover {
+  @apply bg-popover text-popover-foreground border border-border shadow-lg rounded-xl p-6 max-w-md flex flex-col gap-4;
+  background-color: hsl(var(--popover)) !important; /* Solid background */
+  color: hsl(var(--popover-foreground)) !important;
+}
+
+.driver-popover-title {
+  @apply text-lg font-semibold leading-none tracking-tight mb-2;
+  color: hsl(var(--foreground)) !important; /* Standard text color */
+  font-family: inherit !important;
+}
+
+.driver-popover-description {
+  @apply text-sm text-muted-foreground leading-relaxed mb-0;
+  font-family: inherit !important;
+}
+
+/* Footer Layout */
+.driver-popover-footer {
+  @apply flex items-center justify-between mt-6 w-full;
+}
+
+.driver-popover-progress-text {
+  @apply text-xs font-medium text-muted-foreground;
+  white-space: nowrap !important;
+}
+
+.driver-popover-navigation-btns {
+  @apply flex items-center gap-2;
+}
+
+/* 
+   BUTTON STYLES 
+   Standard Shadcn UI Buttons
+*/
+
+/* Base Button Reset */
+.driver-popover-footer button {
+  @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+  @apply h-9 px-4 py-2; /* Size: sm */
+  border: none !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* Previous Button -> Variant: Outline */
+.driver-popover-prev-btn {
+  @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground !important;
+  border-width: 1px !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Next / Finish Button -> Variant: Default (Primary) */
+.driver-popover-next-btn {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 !important;
+  background-image: none !important; /* No gradients */
+}
+
+/* Arrow Styling */
+.driver-popover-arrow-side-left.driver-popover-arrow {
+  @apply border-l-popover;
+  border-left-color: hsl(var(--popover)) !important;
+}
+.driver-popover-arrow-side-right.driver-popover-arrow {
+  @apply border-r-popover;
+  border-right-color: hsl(var(--popover)) !important;
+}
+.driver-popover-arrow-side-top.driver-popover-arrow {
+  @apply border-t-popover;
+  border-top-color: hsl(var(--popover)) !important;
+}
+.driver-popover-arrow-side-bottom.driver-popover-arrow {
+  @apply border-b-popover;
+  border-bottom-color: hsl(var(--popover)) !important;
+}
+
+/* Overlay */
+.driver-overlay path {
+  fill: hsl(var(--background)) !important;
+  opacity: 0.8 !important;
+}
+
+/* 
+   CONSENT MODAL (Centered)
+*/
+.driver-popover-center-text {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  z-index: 2147483647 !important;
+  width: 90vw !important;
+  max-width: 420px !important;
+
+  @apply border-2 border-border shadow-2xl px-6 pt-6 pb-4 gap-3 !important;
+  background-color: hsl(var(--popover)) !important;
+  height: fit-content !important;
+  min-height: 0 !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+}
+
+/* Hide arrow for centered modal */
+.driver-popover-center-text .driver-popover-arrow {
+  display: none !important;
+}
+
+.driver-popover-center-text .driver-popover-title {
+  @apply text-xl text-center mb-1;
+}
+
+.driver-popover-center-text .driver-popover-description {
+  @apply text-center text-sm text-muted-foreground;
+}
+
+.driver-popover-center-text .driver-popover-footer {
+  @apply justify-center gap-3 mt-2 !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Hide progress text in the center modal */
+.driver-popover-center-text .driver-popover-progress-text {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 0 !important;
+}
+
+.driver-popover-center-text .driver-popover-navigation-btns {
+  @apply w-full justify-center gap-3;
+}
+
+.driver-popover-center-text button {
+  @apply h-10 px-6 text-sm font-semibold;
+  min-width: 100px;
+}

@@ -30,12 +30,27 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProviderCardSkeleton from "@/components/dashboard/ProviderCardSkeleton";
+import { startTour } from "@/components/TourGuide";
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_BASE_URL as API_URL } from "@/constants";
 
 const Dashboard = () => {
   const { data: user, isLoading: isUserLoading } = useUserQuery();
   const { data: filesData, isLoading: isFilesLoading } = useFilesQuery();
+
+  // Start Tour Effect
+  React.useEffect(() => {
+    if (user && !user.preferences?.tourCompleted) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        startTour(user, () => {
+          // Optional: Force re-fetch user to update local state if needed
+          // queryClient.invalidateQueries(["user"]);
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   const files = React.useMemo(() => {
     return filesData?.pages.flatMap((page) => page.data.files) || [];
@@ -97,23 +112,33 @@ const Dashboard = () => {
     }
   };
 
-  if (isUserLoading || isFilesLoading)
-    return <Loading text="Initializing Command Center..." />;
+  // Removed blocking loader to show skeletons
+  // if (isUserLoading || isFilesLoading)
+  //   return <Loading text="Initializing Command Center..." />;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="font-heading text-4xl md:text-5xl font-bold tracking-tight text-slate-900 dark:text-white drop-shadow-sm dark:drop-shadow-lg">
+          <h1
+            id="tour-welcome"
+            className="font-heading text-4xl md:text-5xl font-bold tracking-tight text-slate-900 dark:text-white drop-shadow-sm dark:drop-shadow-lg"
+          >
             Storage Overview
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg font-light">
-            Welcome back,{" "}
-            <span className="text-cyan-600 dark:text-cyan-400 font-medium">
-              {user?.email?.split("@")[0]}
-            </span>
-            . Systems operational.
+            {isUserLoading ? (
+              <Skeleton className="h-6 w-64" />
+            ) : (
+              <>
+                Welcome back,{" "}
+                <span className="text-cyan-600 dark:text-cyan-400 font-medium">
+                  {user?.email?.split("@")[0]}
+                </span>
+                . Systems operational.
+              </>
+            )}
           </p>
         </div>
 
@@ -137,7 +162,7 @@ const Dashboard = () => {
                   Encrypt, shard, and distribute your files across the network.
                 </DialogDescription>
               </DialogHeader>
-              <div className="mt-6">
+              <div className="mt-6" id="tour-upload-area">
                 <UploadZone
                   onUploadComplete={() => {
                     setIsUploadOpen(false);
@@ -193,7 +218,10 @@ const Dashboard = () => {
       {/* Core Status Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Total Storage Card */}
-        <div className="col-span-2 glass-panel rounded-3xl p-6 relative overflow-hidden group">
+        <div
+          id="tour-storage-overview"
+          className="col-span-2 glass-panel rounded-3xl p-6 relative overflow-hidden group"
+        >
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <Database className="h-32 w-32 text-cyan-500 dark:text-cyan-400" />
           </div>
@@ -313,7 +341,37 @@ const Dashboard = () => {
           </div>
 
           <div className="space-y-3">
-            {files?.length === 0 ? (
+            {isFilesLoading ? (
+              <>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : files?.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="h-20 w-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 animate-pulse">
                   <Server className="h-10 w-10 text-slate-400 dark:text-slate-500" />
@@ -322,7 +380,8 @@ const Dashboard = () => {
                   No Transmissions Yet
                 </h3>
                 <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
-                  Your secure file network is idle. Upload data to see activity here.
+                  Your secure file network is idle. Upload data to see activity
+                  here.
                 </p>
               </div>
             ) : (

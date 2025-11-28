@@ -164,7 +164,43 @@ const Settings = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Settings</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Settings</h1>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            try {
+              await axios.patch(
+                `${API_BASE_URL}/users/updateMe`,
+                {
+                  preferences: {
+                    ...user.preferences,
+                    tourCompleted: false,
+                  },
+                },
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+              toast({
+                title: "Tour Reset",
+                description:
+                  "The tour will restart on your next visit to the dashboard.",
+              });
+              // Redirect to dashboard to start tour immediately
+              window.location.href = "/dashboard";
+            } catch (err) {
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to reset tour.",
+              });
+            }
+          }}
+        >
+          Reset Tour
+        </Button>
+      </div>
 
       <Dialog open={isUnlinkDialogOpen} onOpenChange={setIsUnlinkDialogOpen}>
         <DialogContent>
@@ -223,7 +259,7 @@ const Settings = () => {
               .map((account) => (
                 <div
                   key={account.providerId}
-                  className="flex items-center justify-between p-3 bg-secondary/20 rounded-md"
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-md"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -266,7 +302,7 @@ const Settings = () => {
               .map((account) => (
                 <div
                   key={account.providerId}
-                  className="flex items-center justify-between p-3 bg-secondary/20 rounded-md"
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-md"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500" />
@@ -312,7 +348,7 @@ const Settings = () => {
               .map((account) => (
                 <div
                   key={account.providerId}
-                  className="flex items-center justify-between p-3 bg-secondary/20 rounded-md"
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-md"
                 >
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500" />

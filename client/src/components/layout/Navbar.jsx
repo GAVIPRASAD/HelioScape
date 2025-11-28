@@ -1,5 +1,5 @@
 import React from "react";
-import { Menu, Moon, Sun, Cloud, User, Search } from "lucide-react";
+import { Menu, Moon, Sun, Cloud, User, Search, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,6 +15,7 @@ import { useSearchStore } from "@/store/useSearchStore";
 import { THEME } from "@/constants";
 import Sidebar from "./Sidebar";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { startTour } from "@/components/TourGuide";
 
 const Navbar = () => {
   const { theme, toggleTheme } = useThemeStore();
@@ -90,6 +91,15 @@ const Navbar = () => {
         <Button
           variant="ghost"
           size="icon"
+          onClick={() => user && startTour(user)}
+          className="rounded-full text-slate-500 dark:text-white/70 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+          title="Start Tour"
+        >
+          <HelpCircle className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleTheme}
           className="rounded-full text-slate-500 dark:text-white/70 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
         >
@@ -99,7 +109,6 @@ const Navbar = () => {
             <Moon className="h-5 w-5" />
           )}
         </Button>
-
         {/* User Profile / Status (Replaces Login Button) */}
         {user ? (
           <Link

@@ -2,7 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useAuthStore } from "@/store/useAuthStore";
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_BASE_URL as API_URL } from "@/constants";
 
 const fetchFiles = async ({ folderId, pageParam = 1 }) => {
   const token = useAuthStore.getState().token;

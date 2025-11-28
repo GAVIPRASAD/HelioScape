@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -15,9 +15,17 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { ROUTES, APP_NAME } from "@/constants";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const Sidebar = ({ className, onItemClick }) => {
   const logout = useAuthStore((state) => state.logout);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+
+  const handleLogoutConfirm = () => {
+    logout();
+    setIsLogoutConfirmOpen(false);
+    if (onItemClick) onItemClick();
+  };
 
   const navItems = [
     {
@@ -25,13 +33,23 @@ const Sidebar = ({ className, onItemClick }) => {
       label: "Storage Overview",
       href: ROUTES.DASHBOARD,
     },
-    { icon: FileIcon, label: "File Systems", href: "/files" },
+    {
+      icon: FileIcon,
+      label: "File Systems",
+      href: "/files",
+      id: "tour-files-link",
+    },
     { icon: Network, label: "Network Map", href: "/visualizer" },
     { icon: Film, label: "Media Center", href: "/media" },
     { icon: User, label: "Profile", href: "/profile" },
     { icon: PieChart, label: "File Map", href: "/distribution/files" },
     { icon: Server, label: "Account Map", href: "/distribution/accounts" },
-    { icon: Settings, label: "System Config", href: ROUTES.SETTINGS },
+    {
+      icon: Settings,
+      label: "System Config",
+      href: ROUTES.SETTINGS,
+      id: "tour-settings-link",
+    },
   ];
 
   return (
@@ -59,6 +77,7 @@ const Sidebar = ({ className, onItemClick }) => {
         {navItems.map((item) => (
           <NavLink
             key={item.href}
+            id={item.id}
             to={item.href}
             onClick={() => onItemClick && onItemClick()}
             className={({ isActive }) =>
@@ -99,16 +118,24 @@ const Sidebar = ({ className, onItemClick }) => {
       {/* Footer / Logout */}
       <div className="p-4 border-t border-slate-200 dark:border-white/5">
         <button
-          onClick={() => {
-            logout();
-            if (onItemClick) onItemClick();
-          }}
+          onClick={() => setIsLogoutConfirmOpen(true)}
           className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-white hover:bg-red-50 dark:hover:bg-red-500/10 hover:border-red-100 dark:hover:border-red-500/20 border border-transparent transition-all duration-300 group"
         >
           <LogOut className="h-5 w-5 group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors" />
           <span>Disconnect</span>
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={handleLogoutConfirm}
+        title="Disconnect Session?"
+        description="Are you sure you want to logout? You will need to sign in again to access your encrypted vault."
+        confirmText="Disconnect"
+        cancelText="Stay Connected"
+        variant="destructive"
+      />
     </div>
   );
 };

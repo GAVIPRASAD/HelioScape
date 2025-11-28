@@ -72,8 +72,9 @@ import { useFolderQuery } from "@/hooks/useFolderQuery";
 import FileDetailsPanel from "@/components/dashboard/FileDetailsPanel";
 import { Info } from "lucide-react";
 import { useInView } from "react-intersection-observer";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_BASE_URL as API_URL } from "@/constants";
 
 import { useUserQuery } from "@/hooks/useUserQuery";
 
@@ -178,12 +179,26 @@ const Files = () => {
 
   // Rename State
   const [isRenameOpen, setIsRenameOpen] = useState(false);
-  const [itemToRename, setItemToRename] = useState(null); // { id, type: 'file'|'folder', name }
+  const [renameTarget, setRenameTarget] = useState(null); // { id, name, type }
   const [newName, setNewName] = useState("");
 
   // Move State
   const [isMoveOpen, setIsMoveOpen] = useState(false);
-  const [itemToMove, setItemToMove] = useState(null); // { id, type: 'file'|'folder', name }
+  const [moveTarget, setMoveTarget] = useState(null); // { id, name, type }
+
+  // Confirm Dialog State
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({
+    title: "",
+    description: "",
+    action: () => {},
+    variant: "default",
+  });
+
+  const openConfirm = ({ title, description, action, variant = "default" }) => {
+    setConfirmConfig({ title, description, action, variant });
+    setConfirmOpen(true);
+  };
   const [moveTargetFolderId, setMoveTargetFolderId] = useState(null);
   // We need a way to browse folders in the move dialog.
   // We can reuse the useFoldersQuery but we need it for the *browsed* folder in the dialog, not the main view.
@@ -444,90 +459,87 @@ const Files = () => {
   };
 
   const handleDeleteFile = async (fileId) => {
-    if (isActionLoading) return;
-    if (!window.confirm("Are you sure you want to delete this file?")) return;
-
-    try {
-      setIsActionLoading(true);
-      const token = useAuthStore.getState().token;
-      await axios.delete(`${API_URL}/files/${fileId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      toast({
-        title: "File Deleted",
-        description: "File removed successfully.",
-      });
-      queryClient.invalidateQueries(["files"]);
-      queryClient.invalidateQueries(["quota"]);
-      if (selectedFiles.has(fileId)) {
-        const newSelected = new Set(selectedFiles);
-        newSelected.delete(fileId);
-        setSelectedFiles(newSelected);
-      }
-    } catch (error) {
-      console.error("Delete failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Delete Failed",
-        description: "Could not delete file.",
-      });
-    } finally {
-      setIsActionLoading(false);
-    }
+    openConfirm({
+      title: "Delete File",
+      description:
+        "Are you sure you want to delete this file? This action cannot be undone.",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setIsActionLoading(true);
+          const token = useAuthStore.getState().token;
+          await axios.delete(`${API_URL}/files/${fileId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          queryClient.invalidateQueries(["files"]);
+          queryClient.invalidateQueries(["quota"]);
+          toast({
+            title: "File Deleted",
+            description: "File removed successfully.",
+          });
+          setConfirmOpen(false);
+        } catch (error) {
+          console.error("Delete failed:", error);
+          toast({
+            variant: "destructive",
+            title: "Delete Failed",
+            description: "Could not delete file.",
+          });
+        } finally {
+          setIsActionLoading(false);
+        }
+      },
+    });
   };
 
   const handleDeleteFolder = async (folderId) => {
-    if (isActionLoading) return;
-    if (
-      !window.confirm(
-        "Are you sure? This will delete the folder and ALL contents."
-      )
-    )
-      return;
-    try {
-      setIsActionLoading(true);
-      const token = useAuthStore.getState().token;
-      await axios.delete(`${API_URL}/folders/${folderId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      toast({
-        title: "Folder Deleted",
-        description: "Folder removed successfully.",
-      });
-      queryClient.invalidateQueries(["folders"]);
-      queryClient.invalidateQueries(["quota"]);
-      if (selectedFolders.has(folderId)) {
-        const newSelected = new Set(selectedFolders);
-        newSelected.delete(folderId);
-        setSelectedFolders(newSelected);
-      }
-    } catch (error) {
-      console.error("Delete failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Delete Failed",
-        description:
-          error.response?.data?.message || "Could not delete folder.",
-      });
-    } finally {
-      setIsActionLoading(false);
-    }
+    openConfirm({
+      title: "Delete Folder",
+      description:
+        "Are you sure? This will delete the folder and ALL its contents.",
+      variant: "destructive",
+      action: async () => {
+        try {
+          setIsActionLoading(true);
+          const token = useAuthStore.getState().token;
+          await axios.delete(`${API_URL}/folders/${folderId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          queryClient.invalidateQueries(["folders"]);
+          queryClient.invalidateQueries(["files"]); // Files inside might be gone
+          toast({
+            title: "Folder Deleted",
+            description: "Folder and contents removed.",
+          });
+          setConfirmOpen(false);
+        } catch (error) {
+          console.error("Delete folder failed:", error);
+          toast({
+            variant: "destructive",
+            title: "Delete Failed",
+            description: "Could not delete folder.",
+          });
+        } finally {
+          setIsActionLoading(false);
+        }
+      },
+    });
   };
 
   // --- Rename Logic ---
   const openRenameDialog = (item, type) => {
-    setItemToRename({ ...item, type });
+    setRenameTarget({ ...item, type });
     setNewName(item.name);
     setIsRenameOpen(true);
   };
 
   const handleRename = async (e) => {
     e.preventDefault();
-    if (!newName.trim() || !itemToRename) return;
+    if (!newName.trim() || !renameTarget) return;
 
     try {
       const token = useAuthStore.getState().token;
-      const endpoint = itemToRename.type === "folder" ? "folders" : "files"; // Note: files endpoint is actually handled by uploadController but route is /files/:id/rename? No, route is /upload/:id/rename?
+      const endpoint = renameTarget.type === "folder" ? "folders" : "files"; // Note: files endpoint is actually handled by uploadController but route is /files/:id/rename? No, route is /upload/:id/rename?
       // Wait, I need to check routes.
       // uploadRoutes is mounted at /files (usually) or /upload?
       // Let's assume standard REST: /api/files/:id/rename and /api/folders/:id/rename
@@ -535,7 +547,7 @@ const Files = () => {
       // uploadRoutes is likely mounted at /files based on listFiles being there.
 
       await axios.patch(
-        `${API_URL}/${endpoint}/${itemToRename._id}/rename`,
+        `${API_URL}/${endpoint}/${renameTarget._id}/rename`,
         {
           name: newName,
         },
@@ -563,7 +575,7 @@ const Files = () => {
 
   // --- Move Logic ---
   const openMoveDialog = (item, type) => {
-    setItemToMove({ ...item, type });
+    setMoveTarget({ ...item, type });
     setMoveDialogCurrentFolderId(null); // Start at root
     setMoveDialogHistory([{ id: null, name: "Home" }]);
     setIsMoveOpen(true);
@@ -575,13 +587,13 @@ const Files = () => {
       const promises = [];
 
       // Case 1: Single Item Move
-      if (itemToMove) {
-        const endpoint = itemToMove.type === "folder" ? "folders" : "files";
+      if (moveTarget) {
+        const endpoint = moveTarget.type === "folder" ? "folders" : "files";
         promises.push(
           axios.patch(
-            `${API_URL}/${endpoint}/${itemToMove._id}/move`,
+            `${API_URL}/${endpoint}/${moveTarget._id}/move`,
             {
-              [itemToMove.type === "folder" ? "parentId" : "folderId"]:
+              [moveTarget.type === "folder" ? "parentId" : "folderId"]:
                 moveDialogCurrentFolderId,
             },
             {
@@ -623,7 +635,7 @@ const Files = () => {
       });
 
       setIsMoveOpen(false);
-      setItemToMove(null);
+      setMoveTarget(null);
       setSelectedFiles(new Set());
       setSelectedFolders(new Set());
       queryClient.invalidateQueries(["files"]);
@@ -698,53 +710,56 @@ const Files = () => {
   };
 
   const handleBulkDelete = async () => {
-    const totalCount = selectedFiles.size + selectedFolders.size;
-    if (
-      !window.confirm(
-        `Are you sure you want to delete ${totalCount} items? Folders will be deleted recursively.`
-      )
-    )
-      return;
+    const totalItems = selectedFiles.size + selectedFolders.size;
+    openConfirm({
+      title: `Delete ${totalItems} Items`,
+      description: `Are you sure you want to delete ${selectedFiles.size} files and ${selectedFolders.size} folders? This cannot be undone.`,
+      variant: "destructive",
+      action: async () => {
+        try {
+          const token = useAuthStore.getState().token;
+          const promises = [];
 
-    try {
-      const token = useAuthStore.getState().token;
-      const promises = [];
+          // Delete Files
+          for (const fileId of selectedFiles) {
+            promises.push(
+              axios.delete(`${API_URL}/files/${fileId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+            );
+          }
 
-      selectedFiles.forEach((id) => {
-        promises.push(
-          axios.delete(`${API_URL}/files/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        );
-      });
+          // Delete Folders
+          for (const folderId of selectedFolders) {
+            promises.push(
+              axios.delete(`${API_URL}/folders/${folderId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+            );
+          }
 
-      selectedFolders.forEach((id) => {
-        promises.push(
-          axios.delete(`${API_URL}/folders/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        );
-      });
+          await Promise.all(promises);
 
-      await Promise.all(promises);
-
-      toast({
-        title: "Bulk Delete Complete",
-        description: `Deleted ${totalCount} items.`,
-      });
-      setSelectedFiles(new Set());
-      setSelectedFolders(new Set());
-      queryClient.invalidateQueries(["files"]);
-      queryClient.invalidateQueries(["folders"]);
-      queryClient.invalidateQueries(["quota"]);
-    } catch (error) {
-      console.error("Bulk delete failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Bulk Delete Failed",
-        description: "Some items could not be deleted.",
-      });
-    }
+          queryClient.invalidateQueries(["files"]);
+          queryClient.invalidateQueries(["folders"]);
+          queryClient.invalidateQueries(["quota"]);
+          setSelectedFiles(new Set());
+          setSelectedFolders(new Set());
+          toast({
+            title: "Bulk Delete Complete",
+            description: `Deleted ${totalItems} items.`,
+          });
+          setConfirmOpen(false);
+        } catch (error) {
+          console.error("Bulk delete failed:", error);
+          toast({
+            variant: "destructive",
+            title: "Bulk Delete Failed",
+            description: "Some items could not be deleted.",
+          });
+        }
+      },
+    });
   };
 
   if (isFilesLoading || isFoldersLoading)
@@ -1515,7 +1530,7 @@ const Files = () => {
       <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rename {itemToRename?.type}</DialogTitle>
+            <DialogTitle>Rename {renameTarget?.type}</DialogTitle>
             <DialogDescription>
               Enter a new name for this item.
             </DialogDescription>
@@ -1567,12 +1582,12 @@ const Files = () => {
                   <div
                     key={folder._id}
                     className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-accent ${
-                      folder._id === itemToMove?._id
+                      folder._id === moveTarget?._id
                         ? "opacity-50 cursor-not-allowed"
                         : ""
                     }`}
                     onClick={() => {
-                      if (folder._id !== itemToMove?._id) {
+                      if (folder._id !== moveTarget?._id) {
                         navigateMoveDialog(folder);
                       }
                     }}
@@ -1597,9 +1612,9 @@ const Files = () => {
             <Button
               onClick={handleMove}
               disabled={
-                moveDialogCurrentFolderId === itemToMove?.folder ||
-                (itemToMove?.type === "folder" &&
-                  moveDialogCurrentFolderId === itemToMove?._id)
+                moveDialogCurrentFolderId === moveTarget?.folder ||
+                (moveTarget?.type === "folder" &&
+                  moveDialogCurrentFolderId === moveTarget?._id)
               }
             >
               Move Here
@@ -1621,6 +1636,17 @@ const Files = () => {
           else handleDeleteFolder(id);
           setIsDetailsPanelOpen(false);
         }}
+      />
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={confirmConfig.action}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        variant={confirmConfig.variant}
+        confirmText="Delete"
+        isLoading={isActionLoading}
       />
     </div>
   );

@@ -56,6 +56,13 @@ const UserSchema = new mongoose.Schema(
       highRedundancyAgreedAt: {
         type: Date,
       },
+      tourCompleted: {
+        type: Boolean,
+        default: false,
+      },
+      dataResponsibilityAccepted: {
+        type: Date,
+      },
     },
   },
   {
