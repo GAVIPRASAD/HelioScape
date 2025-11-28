@@ -6,6 +6,71 @@ const router = express.Router();
 
 router.use(authController.protect);
 
+/**
+ * @swagger
+ * /folders:
+ *   get:
+ *     summary: Get all folders in the current directory
+ *     tags: [Folders]
+ *     parameters:
+ *       - in: query
+ *         name: parentId
+ *         schema:
+ *           type: string
+ *         description: The ID of the parent folder (optional, defaults to root)
+ *     responses:
+ *       200:
+ *         description: List of folders
+ *   post:
+ *     summary: Create a new folder
+ *     tags: [Folders]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               parentId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Folder created
+ *
+ * /folders/{id}:
+ *   get:
+ *     summary: Get a specific folder by ID
+ *     tags: [Folders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Folder details
+ *       404:
+ *         description: Folder not found
+ *   delete:
+ *     summary: Delete a folder and its contents
+ *     tags: [Folders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       204:
+ *         description: Folder deleted
+ *       404:
+ *         description: Folder not found
+ */
 router
   .route("/")
   .get(folderController.getFolders)

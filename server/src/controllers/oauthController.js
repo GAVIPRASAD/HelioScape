@@ -23,6 +23,14 @@ const getProvider = (providerName) => {
   }
 };
 
+/**
+ * Initiates the OAuth flow for a specific provider.
+ * Redirects the user to the provider's consent screen.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.initiateAuth = async (req, res, next) => {
   try {
     const { provider } = req.params;
@@ -47,6 +55,14 @@ exports.initiateAuth = async (req, res, next) => {
   }
 };
 
+/**
+ * Handles the OAuth callback from the provider.
+ * Exchanges the authorization code for tokens and links the account.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.handleCallback = async (req, res, next) => {
   try {
     const { provider } = req.params;
@@ -119,6 +135,13 @@ exports.handleCallback = async (req, res, next) => {
   }
 };
 
+/**
+ * Links a provider account using an authorization code (Client-side flow).
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.linkAccount = async (req, res, next) => {
   // This is the endpoint the Client calls with the code
   try {
@@ -167,6 +190,14 @@ exports.linkAccount = async (req, res, next) => {
   }
 };
 
+/**
+ * Unlinks a provider account.
+ * Prevents unlinking if the account contains files.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.unlinkProvider = async (req, res, next) => {
   try {
     const { provider, providerId } = req.params; // providerId here will be the _id
@@ -230,6 +261,13 @@ exports.unlinkProvider = async (req, res, next) => {
   }
 };
 
+/**
+ * Links a MEGA account using email and password.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.megaLogin = async (req, res, next) => {
   try {
     const { email, password } = req.body;

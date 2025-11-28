@@ -3,6 +3,32 @@ const bcrypt = require("bcryptjs");
 const fieldEncryption = require("mongoose-field-encryption").fieldEncryption;
 const config = require("../config");
 
+const LinkedAccountSchema = new mongoose.Schema({
+  provider: {
+    type: String,
+    required: true,
+    enum: ["google", "dropbox", "mega"],
+  },
+  providerId: { type: String, required: true },
+  email: { type: String },
+  // SECURITY: This field is ENCRYPTED at rest.
+  // For MEGA: Contains JSON string of {email, password} for "Credentials Proxy".
+  // For OAuth: Contains the access token.
+  accessToken: { type: String, required: true },
+  refreshToken: { type: String }, // Encrypted
+  expiryDate: { type: Date },
+  storageQuota: {
+    total: { type: Number, default: 0 },
+    used: { type: Number, default: 0 },
+  },
+});
+
+// Encrypt sensitive fields in the subdocument
+LinkedAccountSchema.plugin(fieldEncryption, {
+  fields: ["accessToken", "refreshToken"],
+  secret: config.JWT_SECRET, // Using JWT_SECRET for now, ideally separate DB_SECRET
+});
+
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -20,27 +46,7 @@ const UserSchema = new mongoose.Schema(
       minlength: 8,
       select: false,
     },
-    linkedAccounts: [
-      {
-        provider: {
-          type: String,
-          required: true,
-          enum: ["google", "dropbox", "mega"],
-        },
-        providerId: { type: String, required: true },
-        email: { type: String },
-        // SECURITY: This field is ENCRYPTED at rest.
-        // For MEGA: Contains JSON string of {email, password} for "Credentials Proxy".
-        // For OAuth: Contains the access token.
-        accessToken: { type: String, required: true },
-        refreshToken: { type: String }, // Encrypted
-        expiryDate: { type: Date },
-        storageQuota: {
-          total: { type: Number, default: 0 },
-          used: { type: Number, default: 0 },
-        },
-      },
-    ],
+    linkedAccounts: [LinkedAccountSchema],
     lastLogin: {
       type: Date,
     },
@@ -69,12 +75,6 @@ const UserSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
-// Encrypt sensitive fields
-UserSchema.plugin(fieldEncryption, {
-  fields: ["linkedAccounts.accessToken", "linkedAccounts.refreshToken"],
-  secret: config.JWT_SECRET, // Using JWT_SECRET for now, ideally separate DB_SECRET
-});
 
 // Hash password before saving
 UserSchema.pre("save", async function (next) {

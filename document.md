@@ -89,12 +89,22 @@ The application is configured via the `.env` file.
 
 1.  **Upload**: Client streams file to Server.
 2.  **Processing**: Server encrypts (AES-256) and shards the stream in memory.
+    - **Chunk Size**: Files are split into **10MB** chunks (configured in `ShardStream.js`).
+    - **Distribution**: Chunks are distributed across connected providers (Google Drive, Dropbox, etc.) to maximize storage utilization.
 3.  **Distribution**: Shards are distributed to connected cloud providers.
 
 ### Security
 
 - **Zero-Knowledge**: Cloud providers only see encrypted data chunks.
-- **At-Rest Encryption**: OAuth refresh tokens are encrypted in MongoDB using `mongoose-field-encryption`.
+- **At-Rest Encryption**:
+  - OAuth refresh tokens are encrypted in MongoDB using `mongoose-field-encryption`.
+  - **Mega Credentials**: Stored as encrypted JSON strings within a subdocument schema (`LinkedAccountSchema`) to ensure complete protection of sensitive "Credentials Proxy" data.
+
+## Development Tools
+
+- **Mongo Express**: A web-based MongoDB admin interface is available at [http://localhost:8081](http://localhost:8081).
+  - **Username**: `admin`
+  - **Password**: `pass` (or as defined in `.env`)
 
 ## Deployment
 
@@ -314,31 +324,45 @@ Endpoint: https://<namespace>.compat.objectstorage.<region>.oraclecloud.com.
 6. Summary .env Template
 
 # --- GOOGLE ---
+
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
 # DEV: http://localhost:5000/api/oauth/google/callback
+
 # PROD: [https://api.yourdomain.com/api/oauth/google/callback](https://api.yourdomain.com/api/oauth/google/callback)
+
 GOOGLE_CALLBACK_URL=
 
 # --- DROPBOX ---
+
 DROPBOX_CLIENT_ID=
 DROPBOX_CLIENT_SECRET=
+
 # DEV: http://localhost:5000/api/oauth/dropbox/callback
+
 # PROD: [https://api.yourdomain.com/api/oauth/dropbox/callback](https://api.yourdomain.com/api/oauth/dropbox/callback)
+
 DROPBOX_CALLBACK_URL=
 
 # --- ONEDRIVE ---
+
 ONEDRIVE_CLIENT_ID=
 ONEDRIVE_CLIENT_SECRET=
+
 # DEV: http://localhost:5000/api/oauth/onedrive/callback
+
 # PROD: [https://api.yourdomain.com/api/oauth/onedrive/callback](https://api.yourdomain.com/api/oauth/onedrive/callback)
+
 ONEDRIVE_CALLBACK_URL=
 
 # --- MEGA ---
+
 MEGA_EMAIL=
 MEGA_PASSWORD=
 
 # --- GENERIC S3 (Oracle/Backblaze/R2) ---
+
 S3_ACCESS_KEY=
 S3_SECRET_KEY=
 S3_ENDPOINT=

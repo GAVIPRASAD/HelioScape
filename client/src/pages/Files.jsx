@@ -710,13 +710,42 @@ const Files = () => {
   };
 
   const handleBulkDelete = async () => {
-    const totalItems = selectedFiles.size + selectedFolders.size;
+    const fileCount = selectedFiles.size;
+    const folderCount = selectedFolders.size;
+    const totalItems = fileCount + folderCount;
+
+    // Dynamic confirmation message based on selection type (Files only, Folders only, or Mixed)
+    let title = "Delete Items";
+    let description = "";
+
+    if (fileCount > 0 && folderCount === 0) {
+      title = `Delete ${fileCount} File${fileCount === 1 ? "" : "s"}`;
+      description = `Are you sure you want to delete ${
+        fileCount === 1 ? "this file" : `these ${fileCount} files`
+      }? This action cannot be undone.`;
+    } else if (folderCount > 0 && fileCount === 0) {
+      title = `Delete ${folderCount} Folder${folderCount === 1 ? "" : "s"}`;
+      description = `Are you sure you want to delete ${
+        folderCount === 1 ? "this folder" : `these ${folderCount} folders`
+      }? This will delete ${
+        folderCount === 1 ? "it" : "them"
+      } and ALL contents.`;
+    } else {
+      title = `Delete ${totalItems} Items`;
+      description = `Are you sure you want to delete ${fileCount} file${
+        fileCount === 1 ? "" : "s"
+      } and ${folderCount} folder${
+        folderCount === 1 ? "" : "s"
+      }? This will delete the folders and ALL their contents.`;
+    }
+
     openConfirm({
-      title: `Delete ${totalItems} Items`,
-      description: `Are you sure you want to delete ${selectedFiles.size} files and ${selectedFolders.size} folders? This cannot be undone.`,
+      title,
+      description,
       variant: "destructive",
       action: async () => {
         try {
+          setIsActionLoading(true);
           const token = useAuthStore.getState().token;
           const promises = [];
 
@@ -757,6 +786,8 @@ const Files = () => {
             title: "Bulk Delete Failed",
             description: "Some items could not be deleted.",
           });
+        } finally {
+          setIsActionLoading(false);
         }
       },
     });

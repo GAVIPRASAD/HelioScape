@@ -209,6 +209,14 @@ exports.uploadFile = (req, res, next) => {
   req.pipe(busboy);
 };
 
+/**
+ * Lists files for the current user.
+ * Supports filtering by folder, provider, and pagination.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.listFiles = async (req, res, next) => {
   try {
     const { folderId, provider, page = 1, limit = 50 } = req.query;
@@ -578,19 +586,15 @@ exports.downloadFile = async (req, res, next) => {
   }
 };
 
-/**
- * Handles file deletion.
- *
- * Pipeline:
- * 1. Finds the file metadata in DB.
- * 2. Iterates through all chunks.
- * 3. Deletes each chunk from its respective cloud provider.
- * 4. Removes the file record from the database.
- */
 const FileService = require("../services/FileService");
 
-// ... (previous code)
-
+/**
+ * Aggregates storage usage statistics per provider.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.getStorageStats = async (req, res, next) => {
   try {
     const stats = await File.aggregate([
@@ -619,6 +623,13 @@ exports.getStorageStats = async (req, res, next) => {
   }
 };
 
+/**
+ * Retrieves metadata for a specific file.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.getFile = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -637,6 +648,14 @@ exports.getFile = async (req, res, next) => {
   }
 };
 
+/**
+ * Deletes a file and its chunks from cloud providers.
+ * Uses FileService for the deletion logic.
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware
+ */
 exports.deleteFile = async (req, res, next) => {
   try {
     const { id } = req.params;

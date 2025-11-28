@@ -34,6 +34,7 @@ export function Toaster() {
           <Toast
             key={id}
             variant={variant}
+            duration={3000}
             {...props}
             className={`glass-panel border-l-2 ${borderColor} bg-white/90 dark:bg-slate-950/90 backdrop-blur-3xl border-y-slate-200/40 border-r-slate-200/40 dark:border-y-white/5 dark:border-r-white/5 shadow-xl ${shadowColor} overflow-hidden pb-2 rounded-2xl`}
           >
