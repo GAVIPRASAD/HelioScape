@@ -38,6 +38,12 @@ services:
       - .env
     environment:
       - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASS}@mongo:27017/helioscape?authSource=admin
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_SECURE=${SMTP_SECURE}
     # volumes:
     #   # - ./server:/app # <--- Disabled for 'watch' mode performance.
     #   # - server_modules:/app/node_modules

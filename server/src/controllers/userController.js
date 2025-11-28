@@ -10,6 +10,8 @@ const filterObj = (obj, ...allowedFields) => {
   return newObj;
 };
 
+const EmailService = require("../services/EmailService");
+
 exports.updateMe = async (req, res, next) => {
   try {
     // 1) Create error if user POSTs password data
@@ -25,7 +27,31 @@ exports.updateMe = async (req, res, next) => {
     // 2) Filtered out unwanted field names that are not allowed to be updated
     const filteredBody = filterObj(req.body, "name", "email", "preferences");
 
-    // 3) Update user document
+    // 3) Check if email is being updated
+    let emailVerificationRequired = false;
+    if (filteredBody.email && filteredBody.email !== req.user.email) {
+      emailVerificationRequired = true;
+      filteredBody.isVerified = false;
+
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      filteredBody.otp = otp;
+      filteredBody.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+      // Send Email
+      try {
+        await EmailService.sendOTP(filteredBody.email, otp);
+      } catch (err) {
+        return next(
+          new AppError(
+            "There was an error sending the verification email. Try again later!",
+            500
+          )
+        );
+      }
+    }
+
+    // 4) Update user document
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
       filteredBody,
@@ -37,6 +63,7 @@ exports.updateMe = async (req, res, next) => {
 
     res.status(200).json({
       status: "success",
+      emailVerificationRequired,
       data: {
         user: updatedUser,
       },

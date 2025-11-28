@@ -53,7 +53,9 @@ class DistributorStream extends Writable {
       const provider = this.providers[providerIndex];
 
       try {
-        // console.log(`[Distributor] Attempting upload chunk ${index} to ${provider.name}...`);
+        console.log(
+          `[Distributor] Attempting upload chunk ${index} to ${provider.name} (${provider.id})...`
+        );
 
         // Create a fresh stream for each attempt
         const chunkStream = Readable.from(data);

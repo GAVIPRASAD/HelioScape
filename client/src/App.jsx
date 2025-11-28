@@ -10,6 +10,9 @@ import Dashboard from "@/pages/Dashboard";
 import LandingPage from "@/pages/LandingPage";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import VerifyEmail from "@/pages/VerifyEmail";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Files from "@/pages/Files";
 import Visualizer from "@/pages/Visualizer";
 import ProfilePage from "@/pages/ProfilePage";
@@ -17,6 +20,7 @@ import Media from "@/pages/Media";
 import FileDistribution from "@/pages/FileDistribution";
 import AccountDistribution from "@/pages/AccountDistribution";
 import AccountDetails from "@/pages/AccountDetails";
+import NotFound from "@/pages/NotFound";
 
 function App() {
   // Initialize theme
@@ -37,6 +41,9 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/oauth/callback" element={<OAuthCallback />} />
 
         {/* Protected/Layout Routes */}
@@ -59,6 +66,7 @@ function App() {
             />
           </Route>
         </Route>
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <Toaster />
     </Router>

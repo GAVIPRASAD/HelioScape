@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,47 +13,50 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, Cloud, ArrowRight } from "lucide-react";
+import { Loader2, Cloud, Lock } from "lucide-react";
 
-import { loginUser } from "@/services/authService";
-import LandingNavbar from "@/components/layout/LandingNavbar";
+import { resetPassword } from "@/services/authService";
 
-const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuthStore();
+const ResetPassword = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuthStore();
 
-  const handleLogin = async (e) => {
+  const [email, setEmail] = useState(location.state?.email || "");
+  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (password !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Passwords do not match",
+        description: "Please ensure both passwords are the same.",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const response = await loginUser(email, password);
+      const response = await resetPassword(email, otp, password);
+      login(response.data.user, response.token);
 
-      if (response.status === "otp_sent") {
-        toast({
-          title: "OTP Sent",
-          description: response.message,
-        });
-        // Redirect to unified verification page
-        navigate("/verify-email", { state: { email } });
-      } else {
-        // Direct login (fallback if 2FA disabled in future)
-        login(response.data.user, response.token);
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully logged in.",
-        });
-        navigate("/dashboard");
-      }
+      toast({
+        title: "Password Reset",
+        description: "Your password has been reset successfully.",
+      });
+      navigate("/dashboard");
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Login Failed",
-        description: error.response?.data?.message || "Something went wrong.",
+        title: "Reset Failed",
+        description: error.response?.data?.message || "Invalid OTP or request.",
       });
     } finally {
       setIsLoading(false);
@@ -62,7 +65,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      <LandingNavbar hideLinks={true} />
       {/* Ambient Background */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-purple-500/10 blur-[120px]" />
@@ -77,14 +79,14 @@ const Login = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-center">
-            Welcome back
+            Reset Password
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access your vault
+            Enter the code sent to {email} and your new password
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -95,18 +97,24 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="bg-background/50"
+                disabled={!!location.state?.email}
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="otp">Verification Code</Label>
+              <Input
+                id="otp"
+                type="text"
+                placeholder="123456"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+                className="bg-background/50 text-center text-2xl tracking-widest"
+                maxLength={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">New Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -114,17 +122,30 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="bg-background/50"
+                minLength={8}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="bg-background/50"
+                minLength={8}
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  Resetting...
                 </>
               ) : (
                 <>
-                  Sign In <ArrowRight className="ml-2 h-4 w-4" />
+                  Reset Password <Lock className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>
@@ -132,12 +153,12 @@ const Login = () => {
         </CardContent>
         <CardFooter className="flex flex-col space-y-2 text-center">
           <div className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
+            Back to{" "}
             <Link
-              to="/register"
+              to="/login"
               className="text-primary hover:underline font-medium"
             >
-              Sign up
+              Login
             </Link>
           </div>
         </CardFooter>
@@ -146,4 +167,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default ResetPassword;

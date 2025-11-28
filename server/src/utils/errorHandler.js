@@ -6,7 +6,17 @@ const handleCastErrorDB = (err) => {
 };
 
 const handleDuplicateFieldsDB = (err) => {
-  const value = err.errmsg.match(/(["'])(\\?.)*?\1/)[0];
+  // Handle both quote styles or no quotes depending on mongo version
+  const match = err.errmsg.match(/(["'])(\\?.)*?\1/);
+  const value = match ? match[0] : "entered value";
+
+  if (err.errmsg.includes("email")) {
+    return new AppError(
+      "Email already exists. Please use a different email.",
+      400
+    );
+  }
+
   const message = `Duplicate field value: ${value}. Please use another value!`;
   return new AppError(message, 400);
 };
@@ -54,19 +64,31 @@ module.exports = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
+  // Transform known errors even in dev for better DX
+  let error = { ...err };
+  error.message = err.message;
+  error.name = err.name;
+  error.code = err.code;
+
+  if (error.code === 11000) error = handleDuplicateFieldsDB(error);
+  if (error.name === "CastError") error = handleCastErrorDB(error);
+  if (error.name === "ValidationError") error = handleValidationErrorDB(error);
+  if (error.name === "JsonWebTokenError") error = handleJWTError();
+  if (error.name === "TokenExpiredError") error = handleJWTExpiredError();
+
   if (process.env.NODE_ENV === "development") {
-    sendErrorDev(err, res);
+    // In dev, if we transformed it to an AppError, use that message but still show stack
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        status: error.status,
+        error: error,
+        message: error.message,
+        stack: err.stack,
+      });
+    } else {
+      sendErrorDev(err, res);
+    }
   } else {
-    let error = { ...err };
-    error.message = err.message;
-
-    if (error.name === "CastError") error = handleCastErrorDB(error);
-    if (error.code === 11000) error = handleDuplicateFieldsDB(error);
-    if (error.name === "ValidationError")
-      error = handleValidationErrorDB(error);
-    if (error.name === "JsonWebTokenError") error = handleJWTError();
-    if (error.name === "TokenExpiredError") error = handleJWTExpiredError();
-
     sendErrorProd(error, res);
   }
 };

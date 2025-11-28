@@ -65,7 +65,8 @@ exports.uploadFile = (req, res, next) => {
             provider.onTokenRefresh(async (newTokens) => {
               console.log("[GoogleDrive] Token Refreshed!");
               const accountIndex = req.user.linkedAccounts.findIndex(
-                (a) => a.provider === "google"
+                (a) =>
+                  a.provider === "google" && a.providerId === account.providerId
               );
               if (accountIndex !== -1) {
                 req.user.linkedAccounts[accountIndex].accessToken =

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Cloud, Moon, Sun, Menu } from "lucide-react";
 import { useThemeStore } from "@/store/useThemeStore";
@@ -11,10 +11,12 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import Sidebar from "./Sidebar"; // Reuse sidebar for mobile menu if needed, or build custom
 
-const LandingNavbar = () => {
+const LandingNavbar = ({ hideLinks = false }) => {
   const { theme, toggleTheme } = useThemeStore();
+  const location = useLocation();
+  const isLoginPage = location.pathname === "/login";
+  const isRegisterPage = location.pathname === "/register";
 
   return (
     <header className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-6 md:px-12 bg-transparent">
@@ -30,17 +32,19 @@ const LandingNavbar = () => {
       </Link>
 
       {/* Desktop Nav */}
-      <nav className="hidden md:flex items-center gap-8">
-        {["Features", "Security", "Pricing"].map((item) => (
-          <a
-            key={item}
-            href={`#${item.toLowerCase()}`}
-            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
-          >
-            {item}
-          </a>
-        ))}
-      </nav>
+      {!hideLinks && (
+        <nav className="hidden md:flex items-center gap-8">
+          {["Features"].map((item) => (
+            <a
+              key={item}
+              href={`#${item.toLowerCase()}`}
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+            >
+              {item}
+            </a>
+          ))}
+        </nav>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-4">
@@ -58,19 +62,23 @@ const LandingNavbar = () => {
         </Button>
 
         <div className="hidden sm:flex items-center gap-3">
-          <Link to="/login">
-            <Button
-              variant="ghost"
-              className="rounded-full font-medium text-muted-foreground hover:text-foreground"
-            >
-              Login
-            </Button>
-          </Link>
-          <Link to="/register">
-            <Button className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-6 shadow-lg shadow-primary/20">
-              Get Started
-            </Button>
-          </Link>
+          {!isLoginPage && (
+            <Link to="/login">
+              <Button
+                variant="ghost"
+                className="rounded-full font-medium text-muted-foreground hover:text-foreground"
+              >
+                Login
+              </Button>
+            </Link>
+          )}
+          {!isRegisterPage && (
+            <Link to="/register">
+              <Button className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-6 shadow-lg shadow-primary/20">
+                Get Started
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Mobile Menu Trigger */}
@@ -88,24 +96,32 @@ const LandingNavbar = () => {
             <SheetTitle>Menu</SheetTitle>
             <SheetDescription>Access site navigation.</SheetDescription>
             <div className="flex flex-col gap-4 mt-8">
-              <Link to="/login" className="w-full">
-                <Button variant="outline" className="w-full justify-start">
-                  Login
-                </Button>
-              </Link>
-              <Link to="/register" className="w-full">
-                <Button className="w-full justify-start">Get Started</Button>
-              </Link>
-              <div className="border-t my-2" />
-              {["Features", "Security", "Pricing"].map((item) => (
-                <a
-                  key={item}
-                  href={`#${item.toLowerCase()}`}
-                  className="text-sm font-medium py-2 hover:text-primary"
-                >
-                  {item}
-                </a>
-              ))}
+              {!isLoginPage && (
+                <Link to="/login" className="w-full">
+                  <Button variant="outline" className="w-full justify-start">
+                    Login
+                  </Button>
+                </Link>
+              )}
+              {!isRegisterPage && (
+                <Link to="/register" className="w-full">
+                  <Button className="w-full justify-start">Get Started</Button>
+                </Link>
+              )}
+              {!hideLinks && (
+                <>
+                  <div className="border-t my-2" />
+                  {["Features"].map((item) => (
+                    <a
+                      key={item}
+                      href={`#${item.toLowerCase()}`}
+                      className="text-sm font-medium py-2 hover:text-primary"
+                    >
+                      {item}
+                    </a>
+                  ))}
+                </>
+              )}
             </div>
           </SheetContent>
         </Sheet>

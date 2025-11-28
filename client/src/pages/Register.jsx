@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/store/useAuthStore";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,13 +16,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Cloud } from "lucide-react";
 
 import { registerUser } from "@/services/authService";
+import LandingNavbar from "@/components/layout/LandingNavbar";
 
 const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuthStore(); // Use login action to set state
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,13 +43,14 @@ const Register = () => {
 
     try {
       const response = await registerUser(email, password);
-      login(response.data.user, response.token);
+      // Don't login yet, wait for verification
+      // login(response.data.user, response.token);
 
       toast({
         title: "Account created!",
-        description: "Welcome to HelioScape.",
+        description: "Please check your email for the verification code.",
       });
-      navigate("/dashboard");
+      navigate("/verify-email", { state: { email } });
     } catch (error) {
       toast({
         variant: "destructive",
@@ -62,6 +64,7 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      <LandingNavbar hideLinks={true} />
       {/* Ambient Background */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-purple-500/10 blur-[120px]" />

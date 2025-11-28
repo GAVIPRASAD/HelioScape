@@ -51,6 +51,38 @@ export const unlinkAccount = async (provider, providerId) => {
   );
   return response.data;
 };
+export const verifyEmail = async (email, otp) => {
+  const response = await axios.post(`${API_URL}/auth/verify-email`, {
+    email,
+    otp,
+  });
+  return response.data;
+};
+
+export const verifyLogin = async (email, otp) => {
+  const response = await axios.post(`${API_URL}/auth/verify-login`, {
+    email,
+    otp,
+  });
+  return response.data;
+};
+
+export const forgotPassword = async (email) => {
+  const response = await axios.post(`${API_URL}/auth/forgot-password`, {
+    email,
+  });
+  return response.data;
+};
+
+export const resetPassword = async (email, otp, password) => {
+  const response = await axios.post(`${API_URL}/auth/reset-password`, {
+    email,
+    otp,
+    password,
+  });
+  return response.data;
+};
+
 export const megaLogin = async (email, password) => {
   const response = await axios.post(
     `${API_URL}/oauth/mega/login`,

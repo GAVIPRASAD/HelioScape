@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   User,
@@ -28,6 +29,7 @@ import { API_BASE_URL as API_URL } from "@/constants";
 const ProfilePage = () => {
   const { user, token, updateUser } = useAuthStore();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +52,18 @@ const ProfilePage = () => {
           { name, email },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
+        if (res.data.emailVerificationRequired) {
+          toast({
+            title: "Verification Required",
+            description: "Please verify your new email address.",
+          });
+          navigate("/verify-email", {
+            state: { email: res.data.data.user.email },
+          });
+          return;
+        }
+
         updateUser({
           ...user,
           name: res.data.data.user.name,

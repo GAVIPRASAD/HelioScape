@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,44 +14,31 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Cloud, ArrowRight } from "lucide-react";
 
-import { loginUser } from "@/services/authService";
-import LandingNavbar from "@/components/layout/LandingNavbar";
+import { forgotPassword } from "@/services/authService";
 
-const Login = () => {
+const ForgotPassword = () => {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const response = await loginUser(email, password);
+      await forgotPassword(email);
 
-      if (response.status === "otp_sent") {
-        toast({
-          title: "OTP Sent",
-          description: response.message,
-        });
-        // Redirect to unified verification page
-        navigate("/verify-email", { state: { email } });
-      } else {
-        // Direct login (fallback if 2FA disabled in future)
-        login(response.data.user, response.token);
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully logged in.",
-        });
-        navigate("/dashboard");
-      }
+      toast({
+        title: "Code Sent",
+        description: "Please check your email for the reset code.",
+      });
+
+      navigate("/reset-password", { state: { email } });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Login Failed",
+        title: "Request Failed",
         description: error.response?.data?.message || "Something went wrong.",
       });
     } finally {
@@ -62,7 +48,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      <LandingNavbar hideLinks={true} />
       {/* Ambient Background */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-purple-500/10 blur-[120px]" />
@@ -77,14 +62,14 @@ const Login = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-center">
-            Welcome back
+            Forgot Password
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access your vault
+            Enter your email to receive a reset code
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -97,34 +82,15 @@ const Login = () => {
                 className="bg-background/50"
               />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-background/50"
-              />
-            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  Sending...
                 </>
               ) : (
                 <>
-                  Sign In <ArrowRight className="ml-2 h-4 w-4" />
+                  Send Code <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}
             </Button>
@@ -132,12 +98,12 @@ const Login = () => {
         </CardContent>
         <CardFooter className="flex flex-col space-y-2 text-center">
           <div className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
+            Remember your password?{" "}
             <Link
-              to="/register"
+              to="/login"
               className="text-primary hover:underline font-medium"
             >
-              Sign up
+              Login
             </Link>
           </div>
         </CardFooter>
@@ -146,4 +112,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default ForgotPassword;

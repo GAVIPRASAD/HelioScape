@@ -35,29 +35,32 @@ import { startTour } from "@/components/TourGuide";
 import { API_BASE_URL as API_URL } from "@/constants";
 
 const Dashboard = () => {
+  const queryClient = useQueryClient();
   const { data: user, isLoading: isUserLoading } = useUserQuery();
   const { data: filesData, isLoading: isFilesLoading } = useFilesQuery();
 
   // Start Tour Effect
+  const tourStartedRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (user && !user.preferences?.tourCompleted) {
+    if (user && !user.preferences?.tourCompleted && !tourStartedRef.current) {
+      tourStartedRef.current = true;
       // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         startTour(user, () => {
-          // Optional: Force re-fetch user to update local state if needed
-          // queryClient.invalidateQueries(["user"]);
+          // Force re-fetch user to update local state
+          queryClient.invalidateQueries({ queryKey: ["user"] });
         });
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, [user, queryClient]);
 
   const files = React.useMemo(() => {
     return filesData?.pages.flatMap((page) => page.data.files) || [];
   }, [filesData]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const { data: quotaData, isLoading: isQuotaLoading } = useQuery({
     queryKey: ["quota"],
@@ -127,7 +130,7 @@ const Dashboard = () => {
           >
             Storage Overview
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg font-light">
+          <div className="text-slate-500 dark:text-slate-400 mt-2 text-lg font-light">
             {isUserLoading ? (
               <Skeleton className="h-6 w-64" />
             ) : (
@@ -139,7 +142,7 @@ const Dashboard = () => {
                 . Systems operational.
               </>
             )}
-          </p>
+          </div>
         </div>
 
         {user?.linkedAccounts?.length > 0 ? (
