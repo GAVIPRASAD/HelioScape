@@ -35,7 +35,11 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 const Dashboard = () => {
   const { data: user, isLoading: isUserLoading } = useUserQuery();
-  const { data: files, isLoading: isFilesLoading } = useFilesQuery();
+  const { data: filesData, isLoading: isFilesLoading } = useFilesQuery();
+
+  const files = React.useMemo(() => {
+    return filesData?.pages.flatMap((page) => page.data.files) || [];
+  }, [filesData]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -113,40 +117,77 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="lg"
-              className="h-12 px-8 rounded-full bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white font-bold shadow-lg transition-all hover:scale-105"
-            >
-              <Upload className="mr-2 h-5 w-5" />
-              Upload Data
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-xl glass-panel border-slate-200 dark:border-white/10 text-slate-900 dark:text-white">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-heading">
-                Secure Transmission
-              </DialogTitle>
-              <DialogDescription className="text-slate-500 dark:text-slate-400">
-                Encrypt, shard, and distribute your files across the network.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="mt-6">
-              <UploadZone
-                onUploadComplete={() => {
-                  setIsUploadOpen(false);
-                  queryClient.invalidateQueries({ queryKey: ["quota"] });
-                  queryClient.invalidateQueries({ queryKey: ["files"] });
+        {user?.linkedAccounts?.length > 0 ? (
+          <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="lg"
+                className="h-12 px-8 rounded-full bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white font-bold shadow-lg transition-all hover:scale-105"
+              >
+                <Upload className="mr-2 h-5 w-5" />
+                Upload Data
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xl glass-panel border-slate-200 dark:border-white/10 text-slate-900 dark:text-white">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading">
+                  Secure Transmission
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 dark:text-slate-400">
+                  Encrypt, shard, and distribute your files across the network.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-6">
+                <UploadZone
+                  onUploadComplete={() => {
+                    setIsUploadOpen(false);
+                    queryClient.invalidateQueries({ queryKey: ["quota"] });
+                    queryClient.invalidateQueries({ queryKey: ["files"] });
+                    toast({
+                      title: "Upload Complete",
+                      description: "Storage stats updated.",
+                    });
+                  }}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                size="lg"
+                className="h-12 px-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
+                onClick={(e) => {
+                  e.preventDefault();
                   toast({
-                    title: "Upload Complete",
-                    description: "Storage stats updated.",
+                    variant: "destructive",
+                    title: "No Storage Connected",
+                    description:
+                      "Please connect a cloud account in Settings first.",
                   });
                 }}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+              >
+                <Upload className="mr-2 h-5 w-5" />
+                Upload Data
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Connect Storage</DialogTitle>
+                <DialogDescription>
+                  You need to connect at least one cloud storage provider
+                  (Google Drive, Dropbox, or MEGA) to start uploading files.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end mt-4">
+                <Button asChild>
+                  <a href="/settings">Go to Settings</a>
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Core Status Section */}
@@ -273,9 +314,16 @@ const Dashboard = () => {
 
           <div className="space-y-3">
             {files?.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                <Server className="h-12 w-12 mb-4 opacity-20" />
-                <p>No files transmitted yet.</p>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="h-20 w-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                  <Server className="h-10 w-10 text-slate-400 dark:text-slate-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+                  No Transmissions Yet
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+                  Your secure file network is idle. Upload data to see activity here.
+                </p>
               </div>
             ) : (
               files?.slice(0, 5).map((file) => (

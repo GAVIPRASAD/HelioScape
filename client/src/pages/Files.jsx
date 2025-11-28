@@ -71,11 +71,15 @@ import { useSearchParams } from "react-router-dom";
 import { useFolderQuery } from "@/hooks/useFolderQuery";
 import FileDetailsPanel from "@/components/dashboard/FileDetailsPanel";
 import { Info } from "lucide-react";
+import { useInView } from "react-intersection-observer";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+import { useUserQuery } from "@/hooks/useUserQuery";
+
 const Files = () => {
   // --- State Management ---
+  const { data: user } = useUserQuery();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentFolderId = searchParams.get("folderId") || null;
   const searchTerm = useSearchStore((state) => state.searchTerm);
@@ -109,8 +113,26 @@ const Files = () => {
   }, [currentFolderId, currentFolder]);
 
   // Data Fetching
-  const { data: files, isLoading: isFilesLoading } =
-    useFilesQuery(currentFolderId);
+  // Data Fetching
+  const {
+    data: filesData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: isFilesLoading,
+  } = useFilesQuery(currentFolderId);
+
+  const files = React.useMemo(() => {
+    return filesData?.pages.flatMap((page) => page.data.files) || [];
+  }, [filesData]);
+
+  const { ref, inView } = useInView();
+
+  React.useEffect(() => {
+    if (inView && hasNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, fetchNextPage]);
   const { data: folders, isLoading: isFoldersLoading } =
     useFoldersQuery(currentFolderId);
 
@@ -894,30 +916,65 @@ const Files = () => {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-            <DialogTrigger asChild>
-              <Button className="rounded-full bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-cyan-500/20">
-                <UploadCloud className="mr-2 h-4 w-4" /> Upload Here
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-xl glass-panel border-slate-200 dark:border-white/10">
-              <DialogHeader>
-                <DialogTitle className="text-slate-900 dark:text-white">
-                  Upload to {folderHistory[folderHistory.length - 1].name}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="mt-4">
-                <UploadZone
-                  onUploadComplete={() => {
-                    setIsUploadOpen(false);
-                    queryClient.invalidateQueries(["files"]);
-                    queryClient.invalidateQueries(["quota"]);
+          {user?.linkedAccounts?.length > 0 ? (
+            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-full bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-cyan-500/20">
+                  <UploadCloud className="mr-2 h-4 w-4" /> Upload Here
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-xl glass-panel border-slate-200 dark:border-white/10">
+                <DialogHeader>
+                  <DialogTitle className="text-slate-900 dark:text-white">
+                    Upload to {folderHistory[folderHistory.length - 1].name}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="mt-4">
+                  <UploadZone
+                    onUploadComplete={() => {
+                      setIsUploadOpen(false);
+                      queryClient.invalidateQueries(["files"]);
+                      queryClient.invalidateQueries(["quota"]);
+                    }}
+                    folderId={currentFolderId}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  className="rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toast({
+                      variant: "destructive",
+                      title: "No Storage Connected",
+                      description:
+                        "Please connect a cloud account in Settings first.",
+                    });
                   }}
-                  folderId={currentFolderId}
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
+                >
+                  <UploadCloud className="mr-2 h-4 w-4" /> Upload Here
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Connect Storage</DialogTitle>
+                  <DialogDescription>
+                    You need to connect at least one cloud storage provider to
+                    upload files.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-end mt-4">
+                  <Button asChild>
+                    <a href="/settings">Go to Settings</a>
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -1004,7 +1061,7 @@ const Files = () => {
                   <TableHead className="w-[40px]">
                     <Checkbox
                       checked={isAllSelected}
-                      onChange={toggleSelectAll}
+                      onCheckedChange={toggleSelectAll}
                       className="border-slate-300 dark:border-white/30 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
                     />
                   </TableHead>
@@ -1037,7 +1094,7 @@ const Files = () => {
                     <TableCell>
                       <Checkbox
                         checked={selectedFolders.has(folder._id)}
-                        onChange={() => toggleSelectFolder(folder._id)}
+                        onCheckedChange={() => toggleSelectFolder(folder._id)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
@@ -1102,7 +1159,7 @@ const Files = () => {
                     <TableCell>
                       <Checkbox
                         checked={selectedFiles.has(file._id)}
-                        onChange={() => toggleSelectFile(file._id)}
+                        onCheckedChange={() => toggleSelectFile(file._id)}
                       />
                     </TableCell>
                     <TableCell
@@ -1241,7 +1298,7 @@ const Files = () => {
                 <div className="absolute top-3 left-3 z-10">
                   <Checkbox
                     checked={selectedFolders.has(folder._id)}
-                    onChange={() => toggleSelectFolder(folder._id)}
+                    onCheckedChange={() => toggleSelectFolder(folder._id)}
                     className={`transition-opacity ${
                       selectedFolders.has(folder._id)
                         ? "opacity-100"
@@ -1333,7 +1390,7 @@ const Files = () => {
                 >
                   <Checkbox
                     checked={selectedFiles.has(file._id)}
-                    onChange={() => toggleSelectFile(file._id)}
+                    onCheckedChange={() => toggleSelectFile(file._id)}
                     className={`transition-opacity ${
                       selectedFiles.has(file._id)
                         ? "opacity-100"
@@ -1357,15 +1414,40 @@ const Files = () => {
                 </div>
               </div>
             ))}
+
+            {/* Infinite Scroll Sentinel */}
+            <div
+              ref={ref}
+              className="col-span-full py-8 flex justify-center w-full"
+            >
+              {isFetchingNextPage ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <span className="text-xs">Loading more files...</span>
+                </div>
+              ) : hasNextPage ? (
+                <span className="text-xs text-muted-foreground opacity-50">
+                  Scroll for more
+                </span>
+              ) : files?.length > 0 ? (
+                <span className="text-xs text-muted-foreground opacity-50">
+                  End of list
+                </span>
+              ) : null}
+            </div>
           </div>
         )}
 
         {!filteredFiles?.length && !filteredFolders?.length && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <FolderIcon className="h-16 w-16 mb-4 opacity-20" />
-            <p className="text-lg font-medium">This folder is empty</p>
-            <p className="text-sm opacity-70">
-              Upload files or create a folder to get started.
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="h-24 w-24 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
+              <FolderIcon className="h-12 w-12 text-slate-400 dark:text-slate-500" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+              This folder is empty
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              Upload files or create a subfolder to organize your data.
             </p>
           </div>
         )}

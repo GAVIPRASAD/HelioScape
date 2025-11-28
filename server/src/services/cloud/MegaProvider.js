@@ -97,6 +97,29 @@ class MegaProvider extends CloudProvider {
   }
 
   /**
+   * Helper to ensure the system vault folder exists.
+   */
+  async ensureSystemFolder(storage) {
+    const VAULT_FOLDER_NAME = "HelioScape_Vault_DO_NOT_DELETE";
+    
+    // Check if folder exists in root
+    // storage.root.children is an array of File objects
+    const existingFolder = storage.root.children.find(
+      (file) => file.name === VAULT_FOLDER_NAME && file.directory
+    );
+
+    if (existingFolder) {
+      return existingFolder;
+    }
+
+    // Create folder if not exists
+    // storage.mkdir returns a Promise<File>
+    console.log("[MegaProvider] Creating Vault Folder...");
+    const newFolder = await storage.mkdir(VAULT_FOLDER_NAME);
+    return newFolder;
+  }
+
+  /**
    * Upload a file stream to MEGA.
    */
   async upload(fileStream, metadata) {
@@ -105,33 +128,16 @@ class MegaProvider extends CloudProvider {
     }
     const storage = await this.getStorage(this.credentials);
 
-    // Upload to root or specific folder?
-    // Let's upload to a "HelioScape" folder.
-    // Finding folder by name is async.
-    // For simplicity, upload to root first.
-    // storage.upload returns a Writable stream? No, it takes options.
-    // `storage.upload(options, [buffer/stream], [cb])`
+    // Ensure Vault Folder exists
+    const vaultFolder = await this.ensureSystemFolder(storage);
 
-    // We need to handle the stream.
-    // megajs upload supports stream.
-
-    const name = `${metadata.name}`; // Unique name needed?
+    const name = `${metadata.name}`;
 
     // Create upload stream
-    const uploadStream = storage.upload(
+    const uploadStream = vaultFolder.upload(
       {
         name: name,
-        size: metadata.size, // Optional but good if known. If unknown, might be issue?
-        // If size is unknown (streaming encryption), megajs might buffer?
-        // "If you don't specify the size, the data is buffered in memory." -> BAD for large files.
-        // We DO NOT know the size of encrypted chunks beforehand easily unless we calculate it.
-        // ShardStream knows chunk size (10MB) except for last one.
-        // DistributorStream passes `metadata` which has `size`?
-        // In `uploadController`, `fileMetadata` has size 0 initially.
-        // But `DistributorStream` receives chunks.
-        // Wait, `DistributorStream` calls `provider.upload(chunkStream, chunkMetadata)`.
-        // We should ensure `chunkMetadata` has the chunk size!
-        // I need to check `DistributorStream` implementation.
+        size: metadata.size,
       },
       fileStream
     );

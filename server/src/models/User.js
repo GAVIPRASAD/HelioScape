@@ -48,6 +48,15 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    preferences: {
+      highRedundancyEnabled: {
+        type: Boolean,
+        default: false,
+      },
+      highRedundancyAgreedAt: {
+        type: Date,
+      },
+    },
   },
   {
     timestamps: true,

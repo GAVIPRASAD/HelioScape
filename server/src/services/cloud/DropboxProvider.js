@@ -115,7 +115,9 @@ class DropboxProvider extends CloudProvider {
     // Let's try passing the stream directly.
 
     // We need a unique path.
-    const path = `/HelioScape/${metadata.name}`; // Or use UUID to avoid collisions
+    // We need a unique path.
+    const VAULT_FOLDER = "/HelioScape_Vault_DO_NOT_DELETE";
+    const path = `${VAULT_FOLDER}/${metadata.name}`; // Dropbox auto-creates parent folders
 
     // Note: We need to instantiate client with credentials passed in (not stored in instance)
     // But upload is called by DistributorStream which doesn't pass credentials directly?

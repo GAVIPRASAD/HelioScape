@@ -28,17 +28,8 @@ class DistributorStream extends Writable {
     this.currentProviderIndex = 0;
   }
 
-  _write(chunkObj, encoding, callback) {
-    // chunkObj is { index, data } from ShardStream
+  async _write(chunkObj, encoding, callback) {
     const { index, data } = chunkObj;
-
-    // Select provider (Round Robin)
-    const provider = this.providers[this.currentProviderIndex];
-    this.currentProviderIndex =
-      (this.currentProviderIndex + 1) % this.providers.length;
-
-    // Create a stream from the buffer for the provider's upload method
-    const chunkStream = Readable.from(data);
 
     // Metadata for this specific chunk
     const chunkMetadata = {
@@ -49,31 +40,95 @@ class DistributorStream extends Writable {
       mimeType: "application/octet-stream",
     };
 
-    // console.log(
-    //   `[Distributor] Uploading chunk ${index} (${data.length} bytes) to ${provider.name}...`
-    // );
+    // Try to upload to providers in Round-Robin order, but failover if needed
+    let attempts = 0;
+    const maxAttempts = this.providers.length;
+    let success = false;
+    let lastError = null;
 
-    provider
-      .upload(chunkStream, chunkMetadata)
-      .then((result) => {
+    // Start with the current provider index
+    let providerIndex = this.currentProviderIndex;
+
+    while (attempts < maxAttempts) {
+      const provider = this.providers[providerIndex];
+
+      try {
+        // console.log(`[Distributor] Attempting upload chunk ${index} to ${provider.name}...`);
+
+        // Create a fresh stream for each attempt
+        const chunkStream = Readable.from(data);
+
+        const result = await provider.upload(chunkStream, chunkMetadata);
+
         this.uploadedChunks.push({
           index,
           provider: provider.name,
+          providerId: provider.id, // Store specific provider instance ID
           providerFileId: result.fileId,
           size: result.size,
-          // Add hash/checksum here later for integrity
         });
-        // console.log(`[Distributor] Chunk ${index} uploaded successfully.`);
-        callback();
-      })
-      .catch((err) => {
+
+        success = true;
+        // Update global index for next chunk to maintain round-robin from this successful provider
+        this.currentProviderIndex = (providerIndex + 1) % this.providers.length;
+        break; // Success!
+      } catch (err) {
+        console.warn(
+          `[Distributor] Failed to upload chunk ${index} to ${provider.name}: ${err.message}`
+        );
+        lastError = err;
+        attempts++;
+        // Move to next provider
+        providerIndex = (providerIndex + 1) % this.providers.length;
+      }
+    }
+
+    if (success) {
+      callback();
+    } else {
+      console.error(
+        `[Distributor] All providers failed for chunk ${index}. Initiating Rollback.`
+      );
+      await this.rollback();
+      callback(
+        new Error(
+          `Upload failed for chunk ${index} after trying all providers. Last error: ${lastError?.message}`
+        )
+      );
+    }
+  }
+
+  /**
+   * Rollback: Delete all uploaded chunks for this file.
+   */
+  async rollback() {
+    console.log("[Distributor] Rolling back uploads...");
+    const deletions = this.uploadedChunks.map(async (chunk) => {
+      try {
+        // Find the provider instance
+        // We stored provider.name, but we need the instance.
+        // If we have multiple accounts of same provider, name might be ambiguous?
+        // We should store provider.id in uploadedChunks! (Added above)
+        const provider =
+          this.providers.find((p) => p.id === chunk.providerId) ||
+          this.providers.find((p) => p.name === chunk.provider);
+
+        if (provider) {
+          await provider.delete(chunk.providerFileId);
+          console.log(
+            `[Distributor] Rolled back chunk ${chunk.index} from ${provider.name}`
+          );
+        }
+      } catch (err) {
         console.error(
-          `[Distributor] Error uploading chunk ${index} to ${provider.name}:`,
+          `[Distributor] Failed to rollback chunk ${chunk.index}:`,
           err
         );
-        // TODO: Implement retry logic or try another provider
-        callback(err);
-      });
+      }
+    });
+
+    await Promise.allSettled(deletions);
+    this.uploadedChunks = [];
   }
 
   getManifest() {

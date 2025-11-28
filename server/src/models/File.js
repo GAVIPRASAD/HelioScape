@@ -28,9 +28,16 @@ const FileSchema = new mongoose.Schema({
     key: { type: String, select: false }, // Encrypted key (future) - for now we might store it or derive it
     iv: { type: String }, // Initial IV if needed, though CipherStream prepends it
   },
+  erasureCoding: {
+    enabled: { type: Boolean, default: false },
+    algorithm: { type: String, default: "raid5-xor" },
+    dataShards: { type: Number },
+    parityShards: { type: Number },
+  },
   chunks: [
     {
-      index: Number,
+      index: mongoose.Schema.Types.Mixed, // Number for data, String for parity
+      type: { type: String, enum: ["data", "parity"], default: "data" },
       provider: String, // 'google', 'dropbox', etc.
       providerFileId: String,
       size: Number,

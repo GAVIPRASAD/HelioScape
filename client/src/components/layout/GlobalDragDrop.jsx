@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useUserQuery } from "@/hooks/useUserQuery";
+import { useToast } from "@/components/ui/use-toast";
 import { useTransferStore } from "@/store/useTransferStore";
 import { useSearchParams } from "react-router-dom";
 import { UploadCloud } from "lucide-react";
@@ -9,6 +11,8 @@ const GlobalDragDrop = ({ children }) => {
   const { addUploads } = useTransferStore();
   const [searchParams] = useSearchParams();
   const currentFolderId = searchParams.get("folderId") || null;
+  const { data: user } = useUserQuery();
+  const { toast } = useToast();
 
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
@@ -38,12 +42,21 @@ const GlobalDragDrop = ({ children }) => {
       e.stopPropagation();
       setIsDragging(false);
 
+      if (!user?.linkedAccounts || user.linkedAccounts.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Upload Blocked",
+          description: "Please connect a cloud account in Settings first.",
+        });
+        return;
+      }
+
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         const files = Array.from(e.dataTransfer.files);
         addUploads(files, currentFolderId);
       }
     },
-    [addUploads, currentFolderId]
+    [addUploads, currentFolderId, user, toast]
   );
 
   useEffect(() => {

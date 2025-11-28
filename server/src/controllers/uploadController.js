@@ -127,8 +127,26 @@ exports.uploadFile = (req, res, next) => {
       const fileMetadata = { name: filename, size: 0, mimeType }; // Size unknown initially
       const distributorStream = new DistributorStream(providers, fileMetadata);
 
+      // Check for High Redundancy Preference
+      const isRedundancyEnabled = req.user.preferences?.highRedundancyEnabled;
+      let erasureStream = null;
+
+      if (isRedundancyEnabled) {
+        const ErasureEncoderStream = require("../services/engine/ErasureEncoderStream");
+        erasureStream = new ErasureEncoderStream(4); // 4 Data + 1 Parity (RAID 5)
+        console.log("[Upload] High Redundancy Enabled (RAID 5)");
+      }
+
       // 3. Run Pipeline
-      file.pipe(cipherStream).pipe(shardStream).pipe(distributorStream);
+      if (erasureStream) {
+        file
+          .pipe(cipherStream)
+          .pipe(shardStream)
+          .pipe(erasureStream)
+          .pipe(distributorStream);
+      } else {
+        file.pipe(cipherStream).pipe(shardStream).pipe(distributorStream);
+      }
 
       // 4. Handle Completion
       distributorStream.on("finish", async () => {
@@ -148,6 +166,12 @@ exports.uploadFile = (req, res, next) => {
             // For prototype, we might just store it (INSECURE) or not store it (User needs it)
             // Let's store it hex encoded for now to verify flow
             key: key.toString("hex"),
+          },
+          erasureCoding: {
+            enabled: isRedundancyEnabled,
+            algorithm: isRedundancyEnabled ? "raid5-xor" : undefined,
+            dataShards: isRedundancyEnabled ? 4 : undefined,
+            parityShards: isRedundancyEnabled ? 1 : undefined,
           },
           chunks: manifest.chunks,
         });
@@ -254,15 +278,10 @@ exports.downloadFile = async (req, res, next) => {
       return next(new AppError("File corruption: No chunks found", 500));
     }
 
-    // Sort chunks by index to ensure correct order
-    const sortedChunks = file.chunks.sort((a, b) => a.index - b.index);
-    console.log(`[Download] Found ${sortedChunks.length} chunks.`);
-
     // Prepare Response Headers
     res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${file.name}"`);
 
-    // Decrypted size = Encrypted size - 32 bytes (16 bytes IV + 16 bytes Auth Tag)
     if (file.size && file.size > 32) {
       res.setHeader("Content-Length", file.size - 32);
     }
@@ -277,9 +296,17 @@ exports.downloadFile = async (req, res, next) => {
     // Handle Decipher Errors
     decipherStream.on("error", (err) => {
       console.error("[Download] Decryption Error:", err);
-      // We can't send a JSON error if headers are already sent, but we can log it.
-      // The stream will end abruptly.
     });
+
+    // Helper: Stream to Buffer
+    const streamToBuffer = async (stream) => {
+      return new Promise((resolve, reject) => {
+        const chunks = [];
+        stream.on("data", (chunk) => chunks.push(chunk));
+        stream.on("end", () => resolve(Buffer.concat(chunks)));
+        stream.on("error", reject);
+      });
+    };
 
     // Helper to get ALL candidate providers for a chunk
     const getCandidateProviders = (chunk) => {
@@ -288,21 +315,16 @@ exports.downloadFile = async (req, res, next) => {
 
       if (providerName.startsWith("google")) {
         const providerId = providerName.replace("google-", "");
-
-        // 1. Try specific account
         const specific = req.user.linkedAccounts.find(
           (acc) => acc.provider === "google" && acc.providerId === providerId
         );
         if (specific) candidates.push(createGoogleProvider(specific));
-
-        // 2. Add ALL other google accounts as fallback
         const others = req.user.linkedAccounts.filter(
           (acc) => acc.provider === "google" && acc.providerId !== providerId
         );
         others.forEach((acc) => candidates.push(createGoogleProvider(acc)));
       } else if (providerName.startsWith("dropbox")) {
         const providerId = providerName.replace("dropbox-", "");
-
         const specific = req.user.linkedAccounts.find(
           (acc) => acc.provider === "dropbox" && acc.providerId === providerId
         );
@@ -315,7 +337,6 @@ exports.downloadFile = async (req, res, next) => {
           });
           candidates.push(p);
         }
-
         const others = req.user.linkedAccounts.filter(
           (acc) => acc.provider === "dropbox" && acc.providerId !== providerId
         );
@@ -330,7 +351,6 @@ exports.downloadFile = async (req, res, next) => {
         });
       } else if (providerName.startsWith("mega")) {
         const providerId = providerName.replace("mega-", "");
-
         const specific = req.user.linkedAccounts.find(
           (acc) => acc.provider === "mega" && acc.providerId === providerId
         );
@@ -342,7 +362,6 @@ exports.downloadFile = async (req, res, next) => {
           });
           candidates.push(p);
         }
-
         const others = req.user.linkedAccounts.filter(
           (acc) => acc.provider === "mega" && acc.providerId !== providerId
         );
@@ -352,7 +371,6 @@ exports.downloadFile = async (req, res, next) => {
           candidates.push(p);
         });
       } else {
-        // Local
         candidates.push(
           new LocalFileSystemProvider(providerName, {
             storagePath: `./storage_mock/${
@@ -361,7 +379,6 @@ exports.downloadFile = async (req, res, next) => {
           })
         );
       }
-
       return candidates;
     };
 
@@ -375,59 +392,186 @@ exports.downloadFile = async (req, res, next) => {
       return provider;
     };
 
-    // Stream chunks sequentially with retry logic
-    const streamChunks = async () => {
-      try {
-        for (const chunk of sortedChunks) {
-          console.log(
-            `[Download] Processing chunk ${chunk.index} (${chunk.provider})`
-          );
+    // --- High Redundancy Logic ---
+    if (file.erasureCoding?.enabled) {
+      console.log("[Download] Using High Redundancy Recovery (RAID 5)");
+      const ErasureDecoderStream = require("../services/engine/ErasureDecoderStream");
+      const erasureDecoder = new ErasureDecoderStream(
+        file.erasureCoding.dataShards || 4
+      );
 
-          const providers = getCandidateProviders(chunk);
-          if (providers.length === 0) {
-            throw new Error(`No linked account found for ${chunk.provider}`);
-          }
+      // Pipe Erasure -> Decipher
+      erasureDecoder.pipe(decipherStream);
 
-          let chunkStream = null;
-          let lastError = null;
+      // Group chunks
+      const dataShards = file.erasureCoding.dataShards || 4;
+      const chunks = file.chunks;
+      const maxIndex = Math.max(
+        ...chunks.filter((c) => typeof c.index === "number").map((c) => c.index)
+      );
+      const totalGroups = Math.floor(maxIndex / dataShards) + 1;
 
-          // Try each provider until one works
-          for (const provider of providers) {
-            try {
-              console.log(`[Download] Trying provider instance...`);
-              chunkStream = await provider.download(chunk.providerFileId);
-              if (chunkStream) break; // Success
-            } catch (err) {
-              console.warn(`[Download] Failed with provider: ${err.message}`);
-              lastError = err;
-            }
-          }
+      for (let g = 0; g < totalGroups; g++) {
+        const groupStart = g * dataShards;
+        const groupEnd = groupStart + dataShards - 1; // Inclusive
+        console.log(
+          `[Download] Processing Group ${g} (Indices ${groupStart}-${groupEnd})`
+        );
 
-          if (!chunkStream) {
-            throw (
-              lastError ||
-              new Error(
-                `Failed to download chunk ${chunk.index} from any available account.`
-              )
-            );
-          }
-
-          await new Promise((resolve, reject) => {
-            chunkStream.pipe(decipherStream, { end: false });
-            chunkStream.on("end", resolve);
-            chunkStream.on("error", reject);
-          });
+        // Identify chunks in this group
+        const groupDataChunks = [];
+        for (let i = groupStart; i <= groupEnd; i++) {
+          const chunk = chunks.find((c) => c.index === i);
+          if (chunk) groupDataChunks.push(chunk);
         }
-        // All chunks piped
-        decipherStream.end();
-      } catch (err) {
-        console.error("[Download] Stream Error:", err);
-        if (!res.headersSent) next(err);
-        else decipherStream.destroy(err);
-      }
-    };
 
-    await streamChunks();
+        // Find parity chunk
+        // Parity index format: "start-end-parity" (e.g., "0-3-parity")
+        // But wait, the last group might be smaller?
+        // ErasureEncoderStream uses groupStart-groupEnd-parity.
+        // We need to find a chunk with type='parity' and matching range.
+        // Or just search by string index.
+        // Let's search loosely for parity in this group.
+        const parityChunk = chunks.find(
+          (c) => c.type === "parity" && c.index.startsWith(`${groupStart}-`)
+        );
+
+        // Attempt to download data chunks
+        const downloadedChunks = [];
+        let missingCount = 0;
+
+        for (let i = groupStart; i <= groupEnd; i++) {
+          const chunk = groupDataChunks.find((c) => c.index === i);
+
+          if (!chunk) {
+            // Chunk record missing from DB? Treat as missing data.
+            console.warn(`[Download] Chunk record missing for index ${i}`);
+            missingCount++;
+            continue;
+          }
+
+          try {
+            const providers = getCandidateProviders(chunk);
+            let buffer = null;
+            for (const provider of providers) {
+              try {
+                const stream = await provider.download(chunk.providerFileId);
+                if (stream) {
+                  buffer = await streamToBuffer(stream);
+                  break;
+                }
+              } catch (e) {
+                /* ignore */
+              }
+            }
+
+            if (buffer) {
+              downloadedChunks.push({ index: i, data: buffer, type: "data" });
+            } else {
+              console.warn(`[Download] Failed to download chunk ${i}`);
+              missingCount++;
+            }
+          } catch (err) {
+            console.error(`[Download] Error processing chunk ${i}:`, err);
+            missingCount++;
+          }
+        }
+
+        // If missing data, try to get parity
+        if (missingCount > 0) {
+          console.log(
+            `[Download] Missing ${missingCount} chunks in group ${g}. Fetching parity...`
+          );
+          if (parityChunk) {
+            try {
+              const providers = getCandidateProviders(parityChunk);
+              let buffer = null;
+              for (const provider of providers) {
+                try {
+                  const stream = await provider.download(
+                    parityChunk.providerFileId
+                  );
+                  if (stream) {
+                    buffer = await streamToBuffer(stream);
+                    break;
+                  }
+                } catch (e) {
+                  /* ignore */
+                }
+              }
+
+              if (buffer) {
+                downloadedChunks.push({
+                  index: parityChunk.index,
+                  data: buffer,
+                  type: "parity",
+                });
+              } else {
+                console.error(
+                  `[Download] Failed to download parity chunk for group ${g}`
+                );
+              }
+            } catch (err) {
+              console.error(`[Download] Error fetching parity:`, err);
+            }
+          } else {
+            console.error(`[Download] No parity chunk found for group ${g}`);
+          }
+        }
+
+        // Push to decoder
+        // We must push ALL chunks for the group, even if we only have some.
+        // The decoder handles the logic of checking if enough are present.
+        downloadedChunks.forEach((c) => erasureDecoder.write(c));
+      }
+
+      erasureDecoder.end();
+    } else {
+      // --- Standard Logic (Sequential Stream) ---
+      const sortedChunks = file.chunks.sort((a, b) => a.index - b.index);
+
+      const streamChunks = async () => {
+        try {
+          for (const chunk of sortedChunks) {
+            // ... (existing logic)
+            const providers = getCandidateProviders(chunk);
+            if (providers.length === 0)
+              throw new Error(`No linked account found for ${chunk.provider}`);
+
+            let chunkStream = null;
+            let lastError = null;
+
+            for (const provider of providers) {
+              try {
+                chunkStream = await provider.download(chunk.providerFileId);
+                if (chunkStream) break;
+              } catch (err) {
+                lastError = err;
+              }
+            }
+
+            if (!chunkStream)
+              throw (
+                lastError ||
+                new Error(`Failed to download chunk ${chunk.index}`)
+              );
+
+            await new Promise((resolve, reject) => {
+              chunkStream.pipe(decipherStream, { end: false });
+              chunkStream.on("end", resolve);
+              chunkStream.on("error", reject);
+            });
+          }
+          decipherStream.end();
+        } catch (err) {
+          console.error("[Download] Stream Error:", err);
+          if (!res.headersSent) next(err);
+          else decipherStream.destroy(err);
+        }
+      };
+
+      await streamChunks();
+    }
   } catch (err) {
     console.error("[Download] Controller Exception:", err);
     next(err);

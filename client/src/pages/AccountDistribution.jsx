@@ -118,149 +118,185 @@ const AccountDistribution = () => {
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold">Account Distribution</h1>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {user?.linkedAccounts?.map((account, index) => {
-          // Determine if this is the first account of this provider type
-          // We only assign "legacy" (unassigned) files to the first account to avoid double counting
-          const isFirstOfProvider =
-            user.linkedAccounts.findIndex(
-              (a) => a.provider === account.provider
-            ) === index;
-
-          const specificUsage =
-            stats?.[`${account.provider}-${account.providerId}`] || 0;
-          const legacyUsage = isFirstOfProvider
-            ? stats?.[account.provider] || 0
-            : 0;
-
-          const calculatedUsage = specificUsage + legacyUsage;
-
-          // Find fresh quota data
-          const freshQuota = quotas?.find(
-            (q) =>
-              q.provider === account.provider &&
-              (q.providerId === account.providerId || q.email === account.email)
-          );
-
-          // Prefer fresh quota, fallback to account data, fallback to 0
-          const cloudUsed = freshQuota?.used || account.storageQuota?.used || 0;
-          const total = freshQuota?.total || account.storageQuota?.total || 0;
-
-          // HelioScape Usage (Our DB)
-          const helioUsed = calculatedUsage;
-
-          // Cloud Usage (Real World) - Fallback to helio usage if cloud reports 0
-          const realCloudUsed = cloudUsed > 0 ? cloudUsed : helioUsed;
-          const percent = total > 0 ? (realCloudUsed / total) * 100 : 0;
-
-          // Provider styling
-          const getProviderStyle = (p) => {
-            const lower = p.toLowerCase();
-            if (lower.includes("google"))
-              return {
-                color: "text-blue-500",
-                bg: "bg-blue-500/10",
-                border: "hover:border-blue-500/50",
-              };
-            if (lower.includes("dropbox"))
-              return {
-                color: "text-indigo-500",
-                bg: "bg-indigo-500/10",
-                border: "hover:border-indigo-500/50",
-              };
-            if (lower.includes("mega"))
-              return {
-                color: "text-red-500",
-                bg: "bg-red-500/10",
-                border: "hover:border-red-500/50",
-              };
-            return {
-              color: "text-zinc-500",
-              bg: "bg-zinc-500/10",
-              border: "hover:border-zinc-500/50",
-            };
-          };
-
-          const style = getProviderStyle(account.provider);
-
-          return (
-            <Card
-              key={account._id}
-              className={`flex flex-col transition-all duration-300 ${style.border} hover:shadow-md`}
+        {user?.linkedAccounts?.length === 0 ? (
+          <div className="col-span-full flex flex-col items-center justify-center py-20 text-center bg-slate-50 dark:bg-white/5 rounded-3xl border border-dashed border-slate-200 dark:border-white/10">
+            <div className="h-24 w-24 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6">
+              <svg
+                className="h-12 w-12 text-slate-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+              No Accounts Connected
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-8">
+              Connect your cloud storage providers to start distributing your
+              files securely across the network.
+            </p>
+            <Button
+              size="lg"
+              className="rounded-full px-8"
+              onClick={() => navigate("/settings")}
             >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`p-2 rounded-xl ${style.bg} flex items-center justify-center`}
-                    >
-                      <ProviderLogo
-                        provider={account.provider}
-                        className="w-8 h-8"
+              Connect Accounts
+            </Button>
+          </div>
+        ) : (
+          user?.linkedAccounts?.map((account, index) => {
+            // Determine if this is the first account of this provider type
+            // We only assign "legacy" (unassigned) files to the first account to avoid double counting
+            const isFirstOfProvider =
+              user.linkedAccounts.findIndex(
+                (a) => a.provider === account.provider
+              ) === index;
+
+            const specificUsage =
+              stats?.[`${account.provider}-${account.providerId}`] || 0;
+            const legacyUsage = isFirstOfProvider
+              ? stats?.[account.provider] || 0
+              : 0;
+
+            const calculatedUsage = specificUsage + legacyUsage;
+
+            // Find fresh quota data
+            const freshQuota = quotas?.find(
+              (q) =>
+                q.provider === account.provider &&
+                (q.providerId === account.providerId ||
+                  q.email === account.email)
+            );
+
+            // Prefer fresh quota, fallback to account data, fallback to 0
+            const cloudUsed =
+              freshQuota?.used || account.storageQuota?.used || 0;
+            const total = freshQuota?.total || account.storageQuota?.total || 0;
+
+            // HelioScape Usage (Our DB)
+            const helioUsed = calculatedUsage;
+
+            // Cloud Usage (Real World) - Fallback to helio usage if cloud reports 0
+            const realCloudUsed = cloudUsed > 0 ? cloudUsed : helioUsed;
+            const percent = total > 0 ? (realCloudUsed / total) * 100 : 0;
+
+            // Provider styling
+            const getProviderStyle = (p) => {
+              const lower = p.toLowerCase();
+              if (lower.includes("google"))
+                return {
+                  color: "text-blue-500",
+                  bg: "bg-blue-500/10",
+                  border: "hover:border-blue-500/50",
+                };
+              if (lower.includes("dropbox"))
+                return {
+                  color: "text-indigo-500",
+                  bg: "bg-indigo-500/10",
+                  border: "hover:border-indigo-500/50",
+                };
+              if (lower.includes("mega"))
+                return {
+                  color: "text-red-500",
+                  bg: "bg-red-500/10",
+                  border: "hover:border-red-500/50",
+                };
+              return {
+                color: "text-zinc-500",
+                bg: "bg-zinc-500/10",
+                border: "hover:border-zinc-500/50",
+              };
+            };
+
+            const style = getProviderStyle(account.provider);
+
+            return (
+              <Card
+                key={account._id}
+                className={`flex flex-col transition-all duration-300 ${style.border} hover:shadow-md`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`p-2 rounded-xl ${style.bg} flex items-center justify-center`}
+                      >
+                        <ProviderLogo
+                          provider={account.provider}
+                          className="w-8 h-8"
+                        />
+                      </div>
+                      <div>
+                        <CardTitle
+                          className={`text-lg font-bold capitalize ${style.color}`}
+                        >
+                          {account.provider}
+                        </CardTitle>
+                        <CardDescription
+                          className="text-xs mt-1 truncate max-w-[180px]"
+                          title={account.email}
+                        >
+                          {account.email}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col justify-end pt-4">
+                  <div className="mb-6">
+                    <span className="text-3xl font-bold tracking-tight">
+                      {formatBytes(helioUsed)}
+                    </span>
+                    <span className="text-sm text-muted-foreground ml-2">
+                      used by HelioScape
+                    </span>
+                  </div>
+
+                  {total > 0 ? (
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Cloud Storage</span>
+                        <span>
+                          {formatBytes(realCloudUsed)} / {formatBytes(total)}
+                        </span>
+                      </div>
+                      <Progress
+                        value={percent}
+                        className="h-1.5"
+                        indicatorClassName={style.bg.replace("/10", "")}
                       />
                     </div>
-                    <div>
-                      <CardTitle
-                        className={`text-lg font-bold capitalize ${style.color}`}
-                      >
-                        {account.provider}
-                      </CardTitle>
-                      <CardDescription
-                        className="text-xs mt-1 truncate max-w-[180px]"
-                        title={account.email}
-                      >
-                        {account.email}
-                      </CardDescription>
+                  ) : (
+                    <div className="mb-4 text-xs text-muted-foreground flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+                      <span>Storage quota not reported</span>
                     </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col justify-end pt-4">
-                <div className="mb-6">
-                  <span className="text-3xl font-bold tracking-tight">
-                    {formatBytes(helioUsed)}
-                  </span>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    used by HelioScape
-                  </span>
-                </div>
+                  )}
 
-                {total > 0 ? (
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Cloud Storage</span>
-                      <span>
-                        {formatBytes(realCloudUsed)} / {formatBytes(total)}
-                      </span>
-                    </div>
-                    <Progress
-                      value={percent}
-                      className="h-1.5"
-                      indicatorClassName={style.bg.replace("/10", "")}
-                    />
-                  </div>
-                ) : (
-                  <div className="mb-4 text-xs text-muted-foreground flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                    <span>Storage quota not reported</span>
-                  </div>
-                )}
-
-                <Button
-                  variant="outline"
-                  className="w-full mt-auto group hover:bg-slate-100 dark:hover:bg-slate-800"
-                  onClick={() =>
-                    navigate(
-                      `/distribution/accounts/${account.provider}/${account.providerId}`
-                    )
-                  }
-                >
-                  View Files
-                  <ArrowRight className="w-4 h-4 ml-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
+                  <Button
+                    variant="outline"
+                    className="w-full mt-auto group hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() =>
+                      navigate(
+                        `/distribution/accounts/${account.provider}/${account.providerId}`
+                      )
+                    }
+                  >
+                    View Files
+                    <ArrowRight className="w-4 h-4 ml-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
     </div>
   );

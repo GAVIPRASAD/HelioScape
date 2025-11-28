@@ -22,12 +22,59 @@ import Loading from "@/components/ui/Loading";
 import { useSearchParams } from "react-router-dom";
 
 import MegaConnectDialog from "../components/MegaConnectDialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DialogFooter } from "@/components/ui/dialog";
+import axios from "axios";
+import { API_BASE_URL } from "../constants";
+import { useAuthStore } from "../store/useAuthStore";
 
 const Settings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: user, isLoading, error } = useUserQuery();
   const [searchParams, setSearchParams] = useSearchParams();
+  const token = useAuthStore((state) => state.token);
+
+  const [isRedundancyDialogOpen, setIsRedundancyDialogOpen] =
+    React.useState(false);
+  const [isAgreed, setIsAgreed] = React.useState(false);
+
+  const updatePreferences = async (enabled) => {
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/users/updateMe`,
+        {
+          preferences: {
+            highRedundancyEnabled: enabled,
+            highRedundancyAgreedAt: enabled
+              ? new Date()
+              : user?.preferences?.highRedundancyAgreedAt,
+          },
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      toast({
+        title: enabled ? "High Redundancy Enabled" : "High Redundancy Disabled",
+        description: enabled
+          ? "Your files will now be protected with parity data."
+          : "Standard storage mode active.",
+      });
+
+      queryClient.invalidateQueries(["user"]);
+    } catch (err) {
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update preferences.",
+      });
+    }
+  };
 
   console.log("Settings Render - User Data:", user);
   if (user?.linkedAccounts) {
@@ -286,6 +333,123 @@ const Settings = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Storage Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Storage Preferences</CardTitle>
+          <CardDescription>
+            Configure how your files are stored across providers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="space-y-0.5">
+              <Label className="text-base font-medium">
+                High Redundancy Storage (Parity)
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Enable RAID 5 erasure coding (XOR Parity) to recover files even
+                if a provider goes offline.
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full dark:bg-yellow-900 dark:text-yellow-200">
+                  Uses +25% Storage
+                </span>
+                {user?.preferences?.highRedundancyEnabled && (
+                  <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full dark:bg-green-900 dark:text-green-200">
+                    Active
+                  </span>
+                )}
+              </div>
+            </div>
+            <Switch
+              checked={user?.preferences?.highRedundancyEnabled || false}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setIsRedundancyDialogOpen(true);
+                } else {
+                  // Allow disabling without confirmation for now
+                  updatePreferences(false);
+                }
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* High Redundancy T&C Dialog */}
+      <Dialog
+        open={isRedundancyDialogOpen}
+        onOpenChange={setIsRedundancyDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enable High Redundancy?</DialogTitle>
+            <DialogDescription>
+              Please review the terms before enabling this feature.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md text-sm space-y-3">
+              <p className="font-semibold text-slate-900 dark:text-white">
+                Benefits:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400">
+                <li>
+                  **Data Recovery**: Your files can be reconstructed even if one
+                  cloud provider fails or deletes your data.
+                </li>
+                <li>**Integrity**: Protects against bit-rot and corruption.</li>
+              </ul>
+              <p className="font-semibold text-slate-900 dark:text-white mt-4">
+                Risks & Costs:
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400">
+                <li>
+                  **Increased Storage**: This feature requires **25% more
+                  storage space**. A 1GB file will consume 1.25GB of your quota.
+                </li>
+                <li>
+                  **Slower Uploads**: Encoding parity data takes extra CPU time
+                  and bandwidth.
+                </li>
+              </ul>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="terms"
+                checked={isAgreed}
+                onCheckedChange={setIsAgreed}
+              />
+              <label
+                htmlFor="terms"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                I understand the storage costs and agree to enable High
+                Redundancy.
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRedundancyDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                updatePreferences(true);
+                setIsRedundancyDialogOpen(false);
+              }}
+              disabled={!isAgreed}
+            >
+              Enable Feature
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

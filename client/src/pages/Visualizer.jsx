@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Visualizer = () => {
   const { data: user, isLoading: isUserLoading } = useUserQuery();
-  const { data: files, isLoading: isFilesLoading } = useFilesQuery(null); // Fetch all root files for now, ideally fetch ALL files flat
+  const { data: filesData, isLoading: isFilesLoading } = useFilesQuery(null);
+
+  const files = React.useMemo(() => {
+    return filesData?.pages.flatMap((page) => page.data.files) || [];
+  }, [filesData]);
 
   // --- Topology Logic ---
   const providers = React.useMemo(() => {
